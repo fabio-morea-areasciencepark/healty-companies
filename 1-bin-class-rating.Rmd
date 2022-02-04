@@ -1,0 +1,174 @@
+--- 
+title: "Excercise: supervised classification"
+author: "Fabio Morea"
+date: "`r Sys.Date()`"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+# Business case
+
+*Business case for this excercise* 
+RCM is the regional association of composite material processing companies, that counts over 1000 associates (companies that have their head office or a local unit in Friuli Venezia Giulia and are interested in some way in manufacturing with composite materials).  RCM is monitoring the performance of its members: each company with a performance level (Top/Mid/Low) that is used for further activities (e.g. Top performers are featured in the newsletter, Mid and Low performers receive different proposals…).
+The classification algorithm is based on financial ratings issued by Modefinance (purchased at 5,00€ per company). Rating is expressed as a value 1 to 10 and 
+The performance level is now based on ModeFinance rating: 
+
+* Top: rating 7 to 10
+* Mid: rating 5-6
+* Low: rating 1 to 4
+
+**Objective:** RCM  wants to develop a new method, leading to the same classification, replacing financial ratings with balance sheet data (which can be purchased at a significantly lower cost, € 0.75 per company).
+The expected result is a model (learning and prediction modules) and a detailed report describilng the model performance (error rate, robustness to unbalanced data, ...) 
+
+**Constraints: ** training and classification will be performed on a laptop, twice a year. No specific constraints on time or computation effort (even if it takes hours, it’s ok).
+
+**Workflow**
+- insert picture here
+-	Classification tree
+
+## Understanding the data
+TODO insert figure here
+
+Data is available from 2 sourecs: 
+* cmp.csv
+* bsd.csv
+* rating.csv
+
+and sould be pre-processed to obtain two vectors: X and y.
+
+
+This section is dedicated to load and preprocess financial statement data for the dataset *imprese-fvg*. 
+The relevant file is "_DATA/imprese-fvg/bilanci-fvg.csv".
+
+```{r include=FALSE}
+library(tidyverse)
+library(ggpubr)
+library(ggthemes)
+theme_set(theme_economist())  
+```
+ 
+ 
+ 
+## Financial data 
+The relevant files are
+
+* *cmp.csv*
+
+* *bsd.csv*. Each observation is a summary of balance sheet data (bsd) of a company (identified by *cf*) for a given year. Column labels need some improvement to remove whitespaces and possibly short english names.
+
+* *rating.csv*
+ 
+
+```{r}
+pathTidyData = './../../_data/tidy/'
+companies <-  read_csv( paste0(pathTidyData,"cmp.csv") ) 
+bsd <-        read_csv( paste0(pathTidyData,"bsd.csv") ) 
+rating <-     read_csv( paste0(pathTidyData,"rating.csv") ) 
+codes <-      read_csv( paste0(pathTidyData,"nace.csv") )
+
+```
+
+## Selection of sample
+
+Select NACE code (see _data/ino/ for a complete list of codes https://ec.europa.eu/eurostat/web/products-manuals-and-guidelines/-/ks-ra-07-015
+codes are organized by: Division / Group / Class
+
+We are interested in Division 22
+22 Manufacture of rubber and plastic products 
+22.1 Manufacture of rubber products 
+22.11 Manufacture of rubber tyres and tubes; retreading and rebuilding of rubber tyres 2211 
+22.19 Manufacture of other rubber products 2219 
+22.2 Manufacture of plastics products 
+22.21 Manufacture of plastic plates, sheets, tubes and profiles 2220* 
+22.22 Manufacture of plastic packinggoods 2220* 
+22.23 Manufacture of builders’ ware of plastic 2220* 
+22.29 Manufacture of other plastic products 
+
+And only companies that have a duty of disclosure of financial information. 
+SOCIETA' DI CAPITALE|SU|SOCIETA' A RESPONSABILITA' LIMITATA CON UNICO SOCIO
+SOCIETA' DI CAPITALE|SR|SOCIETA' A RESPONSABILITA' LIMITATA
+SOCIETA' DI CAPITALE|SP|SOCIETA' PER AZIONI
+SOCIETA' DI CAPITALE|SD|SOCIETA' EUROPEA
+SOCIETA' DI CAPITALE|RS|SOCIETA' A RESPONSABILITA' LIMITATA SEMPLIFICATA
+SOCIETA' DI CAPITALE|RR|SOCIETA' A RESPONSABILITA' LIMITATA A CAPITALE RIDOTTO
+SOCIETA' DI CAPITALE|AU|SOCIETA'  PER AZIONI CON SOCIO UNICO
+SOCIETA' DI CAPITALE|AA|SOCIETA' IN ACCOMANDITA PER AZIONI
+
+```{r}
+#select only some types of ng2 (natura giuridica)
+selectedNg = c("SU", "SR", "SP", "SD", "RS", "RR", "AU", "AA")
+companies <- companies %>% filter(ng2 %in% selectedNg)
+#select only division 28 
+selectedCf <- codes %>% filter(division == 28) %>% select(cf)
+companies  <- companies %>% semi_join(selectedCf) #semi_join() return all rows from x with a match in y
+bsd        <- bsd       %>% semi_join(selectedCf)
+rating     <- rating    %>% semi_join(selectedCf)
+checkDuplicates <- companies %>% filter(duplicated(.[["cf"]]))#check duplicates (none expected)
+```
+
+Now we have a sample of {r length(companies)} companies. Duplicates are {r length(checkDuplicates)}.
+
+meaning of attributes in bsd
+totale patrimonio netto = total equity
+totale attivo = total assets
+totale immobilizzazioni immateriali = total intangible fixed assets
+crediti esigibili entro l'esercizio successivo = accounts receivables
+debiti esigibili entro l'esercizio successivo = debts due within the following financial year
+totale valore della produzione = total production value
+ricavi delle vendite = revenues from sales
+totale costi del personale = total personnel costs
+differenza tra valore e costi della produzione = difference between production value and production costs
+ammortamento immobilizzazione immateriali = amortisation
+utile/perdita esercizio ultimi = profit / loss for the last financial year
+valore aggiunto = value added
+tot.aam.acc.svalutazioni = total amortisation, depreciation and write-downs
+(ron) reddito operativo netto =  (noi) net operating income) )
+
+
+
+## Financial Ratings
+
+Financial ratings issued by ModeFinance https://www.modefinance.com/it
+TODO: improve description: 
+> The credit rating and commercial credit limit available within the s-peek application are evaluated through an innovative methodology called Multi Objective Rating Evaluation which is owned by modeFinance. This innovative methodology studies a corporation as a complex system and deepens the analysis on its different aspects: solvency, debt coverage, liquidity, cash conversion cycle, profitability, fixed asset coverage, compared with the sector which it belongs to and so on.
+With effect from July 10th, 2015, modeFinance Srl is registered as a credit rating agency in accordance with Regulation (EC) No 1060/2009 of the European Parliament ad of the Council of 16 September 2009 (the Credit Rating Agencies Regulation link). MORE Methodology is used by modeFinance also as part of the process of issuance of Credit Ratings in compliance with Regulation (EC) No 1060/2009 of the European Parliament ad of the Council of 16 September 2009 (the Credit Rating Agencies Regulation).
+
+## create X and y 
+
+```{r}
+bsd <- bsd %>% filter(year == 2019)
+rating <- rating %>%  filter(year == 2019)
+
+tmp <- companies %>% 
+        inner_join(bsd, by = "cf") %>% 
+        inner_join(rating, by = "cf") 
+     
+checkDuplicates <- tmp %>% filter(duplicated(.[["cf"]]))#check duplicates (none expected)
+
+names <- tmp %>% select(name,cf,idCompany)
+X     <- tmp %>% select(idCompany, is.sme, is.startup, is.fem, is.young, is.fore, yearsInBusiness, totAssets, totIntang,accounts,totEquity,debts,prod,revenues,personnel,valCost, ammort, profLoss, valAdded, deprec, noi)
+y     <- tmp %>% 
+          mutate(is.Healty = (rating010 >= 7))  %>% 
+          select(idCompany,is.Healty)
+```
+
+## Model selction
+ tree model
+ 
+## Train a single unproned tree
+
+
+## check overfitting
+
+
+## estimate error
+
+## optimized model 
+
+
+## Predict
+
+
+## Conclusions
