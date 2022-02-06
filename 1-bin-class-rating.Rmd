@@ -118,21 +118,6 @@ checkDuplicates <- companies %>% filter(duplicated(.[["cf"]]))#check duplicates 
 
 Now we have a sample of {r length(companies)} companies. Duplicates are {r length(checkDuplicates)}.
 
-meaning of attributes in bsd
-totale patrimonio netto = total equity
-totale attivo = total assets
-totale immobilizzazioni immateriali = total intangible fixed assets
-crediti esigibili entro l'esercizio successivo = accounts receivables
-debiti esigibili entro l'esercizio successivo = debts due within the following financial year
-totale valore della produzione = total production value
-ricavi delle vendite = revenues from sales
-totale costi del personale = total personnel costs
-differenza tra valore e costi della produzione = difference between production value and production costs
-ammortamento immobilizzazione immateriali = amortisation
-utile/perdita esercizio ultimi = profit / loss for the last financial year
-valore aggiunto = value added
-tot.aam.acc.svalutazioni = total amortisation, depreciation and write-downs
-(ron) reddito operativo netto =  (noi) net operating income) )
 
 
 
@@ -162,62 +147,109 @@ y     <- tmp %>%
           mutate(isHealthy = rating010 >= 7)  %>% 
   #        mutate(isHealthy = ifelse(rating010 >= 7,"Y","N"))  %>% 
           select(idCompany,isHealthy)
+```
 
-d <- X %>% inner_join(y)%>% select(-idCompany)
+Create a label - at the current stage a binary label is enough to test out method
 
-d <- d %>% select(totAssets,revenues,debts,profLoss,totIntang,isHealthy) %>%
-            mutate(relrevenues = revenues/totAssets) %>%
-            mutate(relDebts =   debts/totAssets) %>%
-            mutate(relProfLoss =   profLoss/totAssets) %>%
-            mutate(relProfLoss =   profLoss/totAssets) %>%
-            mutate(relIntang =   totIntang/totAssets)%>%
-            select(-totAssets,-revenues,-debts,-profLoss,-totIntang)
+```{r}
 
-
-
-      
+data <- X %>% 
+       inner_join(y)%>% 
+        select(-idCompany)%>%
+        mutate(isHealthy = as.factor(isHealthy)) 
 
 ```
+
+## select most relevant features, based on domain knowledge
+
+we start with a few atttributes, that are deemed more relevant
+included:
+- totAssess = totale attivo = total assets
+- noi  = (ron) reddito operativo netto =  (noi) net operating income
+- personnel = totale costi del personale = total personnel costs
+- debts = debiti esigibili entro l'esercizio successivo = debts due within the following financial year
+
+not included:
+
+- totEquity = totale patrimonio netto = total equity
+- profLoss = uile/perdita esercizio ultimi = profit / loss for the last financial year
+- accounts = crediti esigibili entro l'esercizio successivo = accounts receivables
+- totIntang = totale immobilizzazioni immateriali = total intangible fixed assets
+- prod = totale valore della produzione = total production value
+- revenues = ricavi delle vendite = revenues from sales
+- valCost = differenza tra valore e costi della produzione = difference between production value and production costs
+- ammort = ammortamento immobilizzazione immateriali = amortisation
+- valAdded = valore aggiunto = value added
+- deprec = tot.aam.acc.svalutazioni = total amortisation, depreciation and write-downs
+
+
+```{r}
+
+
+data <- data %>% select(totAssets,noi,personnel, debts,deprec, isHealthy) %>%
+            mutate(relNoi =        noi/totAssets) %>%
+            mutate(relPers =       personnel/totAssets) %>%
+            mutate(relDebts =      debts/totAssets) %>%
+            mutate(relDeprec =    deprec/totAssets)%>%
+            select(-totAssets,-noi,-personnel,-debts, -deprec)
+```
+
+We create normalized variables `{r names(data)}`   
+
 
 ## visualize data
 
 Question: a general overview of the dataset
 Design: pairs plot = matrix of scatterplots that lets you understand the pairwise relationship between different variables in a dataset
 
+Questions: are the variable of the same order of magnitude?
+
 ```{r}
-# ggplot(stack(d), aes(x = ind, y = values)) +
-#   stat_boxplot(geom = "errorbar", width = 0.5) +
-#   labs(x="Samples", y="Frequency") +
-#   geom_boxplot(fill = "white", colour = "#3366FF") + coord_flip()
-
-# require(GGally)
-# d %>% select(-isHealthy) %>% ggpairs(d)
-
-plot(d)
+ggplot(stack(data), aes(x = ind, y = values)) +
+ stat_boxplot(geom = "errorbar", width = 0.5) +
+ labs(x="Samples", y="Frequency") +
+ geom_boxplot(fill = "white", colour = "#3366FF") + coord_flip()
 
 ```
+Questions: are the variables 
+
+```{r}
+data %>% pivot_longer(cols=!isHealthy) %>% ggplot(aes(x=isHealthy, y=value, color = isHealthy)) + geom_boxplot() + facet_grid(.~name, scales="free") 
+
+# require(GGally)
+# data %>%  ggpairs()
+
+#plot(data)
+
+```
+
+
+
 Visualize differences between Healty and non healty companies according to two variables
 
 ```{r}
-plot1 <- d %>% ggplot(aes(x=relrevenues, y=relDebts,  color=isHealthy)) + geom_point()
-plot2 <- d %>% ggplot(aes(x=relProfLoss, y=relIntang, color=isHealthy)) + geom_point()
+plot1 <- data %>% ggplot(aes(x=relNoi, y=relDebts,  color=isHealthy)) + geom_point()
+plot2 <- data %>% ggplot(aes(x=relDeprec, y=relPers, color=isHealthy)) + geom_point()
 ggarrange(plot1,plot2)
 
+ 
 ```
-the figure above higlights that there is no clear separation.
+the figure above higlights shows at a glance that is no trivial decision boundary. 
 
 
 Question: Are the distribution of variables different between Healty and non-healty companies?
 Design: three boxplots
 ```{r}
-d %>% pivot_longer(cols=!isHealthy) %>% ggplot(aes(x=isHealthy, y=value)) + geom_boxplot() + facet_grid(.~name, scales="free")  
-d %>% pivot_longer(cols=!isHealthy) %>% ggplot(aes(x=isHealthy, y=value)) + geom_violin() + facet_grid(.~name, scales="free")  
+data %>% pivot_longer(cols=!isHealthy) %>% ggplot(aes(x=isHealthy, y=value,  color=isHealthy)) + geom_boxplot() + facet_grid(.~name, scales="free")  
+data %>% pivot_longer(cols=!isHealthy) %>% ggplot(aes(x=isHealthy, y=value,  color=isHealthy)) + geom_violin() + facet_grid(.~name, scales="free")  
 
 ```
 
-we can see small differences.Conclusions
+we can see small differences.
+
+Conclusions
 - Healty and non healty  appear hard to tell apart with the given attributes
-- Which attributes appear more useful for inferring health?
+- Which attributes appear more useful for inferring health? relDebts and relNoi
 
 
 ## Tree 
@@ -230,10 +262,12 @@ The learning function in tree requires a dataframe and an indication of the depe
 
 ```{r}
 require(tree)
-model <- tree(isHealthy~relrevenues+relDebts,d)
+model <- tree(isHealthy~.,data) #~relNoi+relDebts
 plot(model)
+text(model)
+print(model)
 ```
-
+the printed tree shows that "yearsInBusiness is not used"
 or with another library
 
 ```{r}
@@ -273,7 +307,7 @@ split  (e.g., 20% of the overall data)
  We use `sample()` for shuffling the set of row-indexes of `d` and take a subset of this set that will act as the indexes of the learning data.
 ```{r}
 fraction <- .8
-indexes.learning = sample(c(1:nrow(d)))[1:(nrow(d)*fraction)]
+indexes.learning = sample(c(1:nrow(data)))[1:(nrow(data)*fraction)]
 # idxs <- sample(nrow(d), n*fraction)
 # train_data <- df[ idxs,]
 # test_data  <- df[-idxs,]
@@ -281,14 +315,14 @@ indexes.learning = sample(c(1:nrow(d)))[1:(nrow(d)*fraction)]
 
 Now we can learn the tree  
 ```{r}
-model = tree(isHealthy~relrevenues+relDebts, d[indexes.learning,])
+model = tree(isHealthy~., data[indexes.learning,])
 plot(model)
-print(model)
+text(model)
 ```
 
 The `predict()` function takes a dataframe with possibly new observations and predict the corresponding labels: the results is hence a vector.
 ```{r}
-predicted.y = predict(model, d[-indexes.learning,])
+predicted.health = predict(model, data[-indexes.learning,], type = "class")
 ```
 Note that:
 
@@ -298,7 +332,16 @@ Note that:
 
 Now we can compute the classification error rate by comparing `predicted.y` against the expected $y$:
 ```{r}
-classification.error <- length(which(predicted.y!=d$isHealthy[-indexes.learning]))/length(predicted.y)
+classification.error <- length(which(predicted.health!=data$isHealty[-indexes.learning]))/length(predicted.health)
+classification.error
+
+errors <- data[-indexes.learning,] %>% 
+  select(isHealthy) %>% 
+  mutate(ph = predicted.health) %>%
+  mutate(err = (isHealthy = ph)) %>% 
+  filter(err == TRUE) %>% 
+  nrow()
+print(errors)
 ```
 
 Note that `which()` returns the indexes of a boolean vector items that are true.
@@ -306,18 +349,45 @@ Note that `which()` returns the indexes of a boolean vector items that are true.
 Another way is to "compute" the **confusion matrix** and then obtaining the error from that.
 The confusion matrix shows the number misclassifications, class by class:
 ```{r}
-table(predicted.y, d$isHealthy[-indexes.learning])
+table(predicted.health, data$isHealthy[-indexes.learning])
 ```
 Given that matrix, the accuracy of classification is:
 ```{r}
-conf.matrix = table(predicted.y, d$isHealthy[-indexes.learning])
+conf.matrix = table(predicted.health, data$isHealthy[-indexes.learning])
 sum(diag(conf.matrix))/sum(conf.matrix)
 ```
 and the error rate can be computed as:
 ```{r}
-error.species = 1-sum(diag(conf.matrix))/sum(conf.matrix)
-error.species
+error = 1-sum(diag(conf.matrix))/sum(conf.matrix)
+error
 ```
+
+Out of simplicity, we might build a function that does all those operations together, with some parameters:
+```{r}
+computeErrorRate = function(categorical.y.name, data, learner, p.learn = 0.8, ...) {
+  indexes.learning = sample(c(1:nrow(data)))[1:(nrow(data)*p.learn)]
+  model = learner(formula(paste0(categorical.y.name,"~.")), data[indexes.learning,], ...)
+  predicted.y = predict(model, data[-indexes.learning, ], type="class")
+  #length(which(predicted.y!=data[-indexes.learning, categorical.y.name]))/length(predicted.y)
+  
+  
+  errors <- data[-indexes.learning,] %>% 
+    select(categorical.y.name) %>% 
+    mutate(ph = predicted.y) %>%
+    mutate(err = (categorical.y.name = ph)) %>% 
+    filter(err == TRUE) %>% 
+    nrow()
+  
+  errors/length(predicted.y)
+
+}
+
+
+print(computeErrorRate("isHealthy", data, tree))
+print(computeErrorRate("isHealthy", data, rpart))
+
+```
+
 
 
 ## Train a single unproned tree
