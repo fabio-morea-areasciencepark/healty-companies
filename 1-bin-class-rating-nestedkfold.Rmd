@@ -10,10 +10,35 @@ output:
     fig_height: 4
 ---
 
+
+
+```{r include=FALSE}
+library(tidyverse)
+library(ggpubr)
+library(ggthemes)
+theme_set( theme_gray(base_size = 12))  
+```
+
+ 
 # 1.	Introduction
-Description of the problem and a motivation for addressing it, why relevant
+Description of the problem and a motivation for addressing it, why relevant. 
+
+Area Science Park is interested in predicting a label "isHealty"... used for monitoring the performance of companis within homogeneous groups. Each company is associated with a performance level (isHealthy = True/False) that is used for further activities (e.g. "Top"healthy" companies  are featured in the newsletter, others are offered services to boost innovation and performance). 
+The classification algorithm is based on financial ratings, financial indicators and employment indicators. 
+The goal is to predict the label *without* using financial indicators, that is expansive. (purchased at 5,00€ per company).
+
+
+**Objective:**  to develop a new method, leading to the same classification, replacing financial ratings with balance sheet data (which can be purchased at a significantly lower cost, € 0.75 per company).
+The expected result is a model (learning and prediction modules) and a detailed report describilng the model performance (error rate, robustness to unbalanced data, ...) 
+
+The method should be presented to a group of people with a basic knowledge of R.
+
+**Constraints: ** training and classification will be performed on a laptop, twice a year. No specific constraints on time or computation effort (even if it takes hours, it’s ok).
 
 # 2.	Formal statement of the problem
+
+Define a model such that ...
+
 
 # 3.	Indexes for measuring the solutions
 - error rate
@@ -23,96 +48,6 @@ Description of the problem and a motivation for addressing it, why relevant
 - most relevant features
 - required to feasibility of proposed solution with the data available
 
-# 5.	Proposed solution
-
-## 5.1 trees (intuition)
-two examples of trees with different values of the hyperparameter k
-
-## 5.2 AutoTunintBuildDecisionTree (optimize kmin by internal cross validation procedure) 2 nested cross validations, as in lecture 8, 21:00. select optimal value of kmin
-
-# 6.	Experimental procedure for tunind and measuring effectiveness of the model 
-
-- auto tuning uses CV to select hyperparameter kmin
-- experimental procedure uses CV to assess effectiveness on unseen data
-- the result is a nested CV where the Learner is called $(10m+1)k$ times 
-
-data is split in learn and test to assess effectiveness
-learning data is then split in k folds to tune hyperparameter
-
-we use stratified for both to ensure a 
-
-we use a *Cross-Validation** is a resampling procedure used to evaluate machine learning models and access how the model will perform for an independent test dataset.
-
-*Hyperparameter optimization or tuning** is a process of choosing a set of hyperparameters for a machine learning algorithm that performs best for a particular dataset.
-
-cross-validation is used to evaluate the performance of a machine learning algorithm and Hyperparameter tuning is used to find the best set of hyperparameters for that machine learning algorithm.
-
-Model selection without nested cross-validation uses the same data to tune model parameters and evaluate model performance that may lead to an optimistically biased evaluation of the model. We get a poor estimation of errors in training or test data due to information leakage. To overcome this problem, Nested Cross-Validation comes into the picture.
-
-Nested Cross-Validation (Nested-CV) nests cross-validation and hyperparameter tuning. It is used to evaluate the performance of a machine learning algorithm and also estimates the generalization error of the underlying model and its hyperparameter search.
-
-
-*k-fold CV**: This procedure splits the data into k folds or groups. (k-1) groups will be assigned to train and the remaining group to validate data. This step is repeated for k-steps until all the groups participated in the validation data.
-*StatifiedKfold CV**: This procedure is similar to the k-fold CV. Here the dataset is partitioned into k groups or folds such that the validation and train data has an equal number of instances of target class label. This ensures that one particular class is not over present in the validation or train data especially when the dataset is imbalanced.
-
-(k-fold cross validation procedure) is an experimental procedure
-# 7.	Discussion
-## 7.1 Effectiveness and accuracy
-## 7.2 Robustness of the approach to different samples
-# conclusions
-(we did what was required)
-
-<!-- markdown optimization https://garrettgman.github.io/rmarkdown/pdf_document_format.html#overview -->
-
-## Business case
-
-*Business case for this excercise* 
-Area Science Park is interested in predicting a label "isHealty". 
-<!-- The  is the regional association of composite material processing companies, that counts over 1000 associates (companies that have their head office or a local unit in Friuli Venezia Giulia and are interested in some way in manufacturing with composite materials). -->
-used for monitoring the performance of companis within homogeneous groups. Each company is associated with a performance level (isHealthy = True/False) that is used for further activities (e.g. "Top"healthy" companies  are featured in the newsletter, others are offered services to boost innovation and performance). 
-The classification algorithm is based on financial ratings, financial indicators and employment indicators. 
-The goal is to predict the label *without* using financial indicators, that is expansive. (purchased at 5,00€ per company).
-
-**Objective:**  to develop a new method, leading to the same classification, replacing financial ratings with balance sheet data (which can be purchased at a significantly lower cost, € 0.75 per company).
-The expected result is a model (learning and prediction modules) and a detailed report describilng the model performance (error rate, robustness to unbalanced data, ...) 
-
-**Constraints: ** training and classification will be performed on a laptop, twice a year. No specific constraints on time or computation effort (even if it takes hours, it’s ok).
-
-**Workflow**
-- insert picture here
--	Classification tree
-
-<!-- The goal is not "build a ML system on this data", but rather a question to be answered. -->
-<!-- So we should: -->
-
-<!-- 0. understand the question (that probably includes giving an interpretation to "hardest") -->
-<!-- 1. design a method for answering the question -->
-<!-- 2. implement that method -->
-<!-- 3. provide the answer by applying the method -->
-
-## Understanding the data
-TODO insert figure here
-
-Data is available from 4 sourecs: 
-* cmp.csv
-* bsd.csv
-* rating.csv
-* empl_flow.csv [TODO]
-
-and sould be pre-processed to obtain two vectors: X and y.
-
-## Feature selection
-
-This section is dedicated to load and preprocess data
-
-```{r include=FALSE}
-library(tidyverse)
-library(ggpubr)
-library(ggthemes)
-theme_set( theme_gray(base_size = 12))  
-```
- 
- 
 The relevant files are
 
 * *cmp.csv* and *codes.csv*: ... Each observation is ... there are p attributes. We will use .... to filter companies that belong to a specific sector () and of a specific type.
@@ -261,53 +196,13 @@ data %>%  select(totAssets, totEquity, totIntang, noi) %>%
   select(rE, rI, noi) %>%
   ggpairs()
 
-
-
-
 ```
+
 
 we check for the scale of each variable 
 
-```{r}
-# gruop1 <- c(is.sme, is.startup, is.fem, is.young, is.fore)
-# group2 <- c(yearsInBusiness)
-# group3 <- c(totAssets, totIntang,accounts,totEquity,debts,prod,revenues,personnel,valCost, ammort, profLoss, valAdded, deprec, noi)
-#require(GGally)
-#data %>%  select(is.sme:is.fore, isHealthy) %>% ggpairs()
-
-```
-
-
 
 ```{r}
-#data %>%  select(yearsInBusiness, totAssets, noi, isHealthy) %>% ggpairs()
-#data %>%  select(totEquity, totAssets, totIntang,noi, profLoss, valCost , isHealthy) %>% ggpairs()
-
-
-```
-
-
-```{r}
-
-# data <- data %>% select(totAssets,noi,personnel, debts,totIntang, isHealthy) %>%
-#             rowwise() %>%
-#             mutate(relNoi =        log10(noi)/log10(totAssets)) %>%
-#             mutate(relPers =       log10(personnel)/log10(totAssets)) %>%
-#             mutate(relDebts =      log10(debts)/log10(totAssets)) %>%
-#             mutate(relIntang =     log10(totIntang)/log10(totAssets))%>%
-#   
-#             select(-totAssets,-noi,-personnel,-debts, -totIntang)
-# 
-# data %>%
-#   pivot_longer(cols=!isHealthy) %>% 
-#   ggplot(aes(x=isHealthy, y=value, color = isHealthy)) + geom_boxplot() + facet_grid(.~name, scales="free") 
-
-```
-
-
-
-```{r}
-#(totAssets, totIntang,accounts,totEquity,debts,prod,revenues,personnel,valCost, ammort, profLoss, valAdded, deprec, noi)
 
 data <- data %>% select(totAssets,totEquity, noi,personnel,prod, debts,deprec,valCost,totIntang, revenues,yearsInBusiness,isHealthy) %>%
             mutate(relInt =   totIntang/totAssets) %>%
@@ -324,11 +219,6 @@ data <- data %>% select(totAssets,totEquity, noi,personnel,prod, debts,deprec,va
 ```
 
 create normalized variables `{r names(data)}`   and scaled 
-
-
-
-
-
 Questions: are the variable of the same order of magnitude?
 
 ```{r}
@@ -358,23 +248,17 @@ ggarrange(plot1,plot2)
 the figure above higlights shows at a glance that is no trivial decision boundary. 
 
 
-Question: Are the distribution of variables different between Healty and non-healty companies?
-Design: violin boxplots
-```{r}
-# data %>% pivot_longer(cols=!isHealthy) %>% ggplot(aes(x=isHealthy, y=value,  color=isHealthy)) + geom_boxplot() + facet_grid(.~name, scales="free")  
-# data %>% pivot_longer(cols=!isHealthy) %>% ggplot(aes(x=isHealthy, y=value,  color=isHealthy)) + geom_violin() + facet_grid(.~name, scales="free")  
 
-```
-
-we can see small differences.
-
-Conclusions
-- Healty and non healty  appear hard to tell apart with the given attributes
+ - Healty and non healty  appear hard to tell apart with the given attributes
 - Which attributes appear more useful for inferring health? relDebts and relNoi
 
+# 5.	Proposed solution
 
-# Decision Trees 
-[short intro to tree learning]
+## 5.1 trees (intuition)
+two examples of trees with different values of the hyperparameter k
+
+
+ [short intro to tree learning]
 We use "tree" that provides:
 - a function for doing the learning `tree()`
 - a function for doing the prediction, usually named `predict()`
@@ -382,8 +266,7 @@ We use "tree" that provides:
 The learning function in tree requires a dataframe and an indication of the dependency, using a data type, peculiar of R, known as **formula** as in the examples `a ~ b+c` (variable `a` depends on `b` and `c`) or `a ~ .` (variable `a`  depends on all the other variables).
 The following is an example of tree with a limited complexity:
 
-## a simple tree
-* mincut: The minimum number of observations to include in either child node. This is a weighted quantity; the observational weights are used to compute the ‘number’. The default is 5.
+ * mincut: The minimum number of observations to include in either child node. This is a weighted quantity; the observational weights are used to compute the ‘number’. The default is 5.
 * minsize: The smallest allowed node size: a weighted quantity. The default is 10.
 
 ```{r}
@@ -393,8 +276,10 @@ plot(model)
 text(model)
 print(model)
 ```
- 
-## measure the performance of the tree
+
+
+
+## 5.2 measure the performance of the tree
 We have a few options:
 
 - measure error on the learning data
@@ -498,21 +383,7 @@ print(computeErrorRate("isHealthy", data, tree))
 ```
 
 
-
-## measure error ratio over different values of the learn to test rario. The values are stocastic due to the random selection of learn and test datasets
-
-```{r}
-
-#computeErrorRate = function(categorical.y.name, data, learner, p.learn = 0.8, ...) {
-# 
-# ratio = seq(0.1, 0.99, 0.05)
-# error = ratio %>% map_dbl(function(r){computeErrorRate("isHealthy", data, tree, r)})
-# tibble(ratio=ratio, error=error) %>% ggplot(aes(x=ratio,y=error))+geom_line()+ylim(0,1)
-```
-
-
-
-## check overfitting
+## 5.3 check overfitting
 
 compare errors on learning and training dataset
 
@@ -545,139 +416,8 @@ err.rate.training
 ```
 
 
-### Compute the learning error and test error for different values of the learning-to-test data ratio  
 
-```{r}
-# computeErrorRate2 = function(categorical.y.name, data, learner, p.learn = 0.8, ...) {
-# 
-#   print(paste("learning a model for ", categorical.y.name, "using parameter = ", p.learn))
-# 
-#   indexes.learning = sample(c(1:nrow(data)))[1:(nrow(data)*p.learn)]
-#   model = learner(formula(paste0(categorical.y.name,"~.")), data[indexes.learning,], ...)
-# 
-#   predicted.y.learning = predict(model, data[indexes.learning, ], type="class")
-#   errors.learning <- data[indexes.learning,] %>% 
-#     select(categorical.y.name) %>% 
-#     mutate(ph = predicted.y.learning) %>%
-#     mutate(err = (categorical.y.name = ph)) %>% 
-#     filter(err == TRUE) %>% 
-#     nrow()/length(predicted.y.learning)
-#   
-#   predicted.y.test = predict(model, data[-indexes.learning, ], type="class")
-#   errors.test <- data[-indexes.learning,] %>% 
-#     select(categorical.y.name) %>% 
-#     mutate(ph = predicted.y.test) %>%
-#     mutate(err = (categorical.y.name = ph)) %>% 
-#     filter(err == TRUE) %>% 
-#     nrow()/length(predicted.y.test)
-#   
-#   c(errors.learning,errors.test)
-# }
-# 
-# ratio = seq(0.1, 0.99, 0.02)
-# error1 = ratio %>% map_dbl(function(r){computeErrorRate2("isHealthy", data, tree, r, mindev = 0, minsize = 2  )[1]})
-# error2 = ratio %>% map_dbl(function(r){computeErrorRate2("isHealthy", data, tree, r, mindev = 0, minsize = 2   )[2]})
-# tibble(ratio=ratio, error1=error1, error2=error2) %>% 
-#   ggplot()+geom_line(aes(x=ratio,y=error1, color = 'blue'))+geom_line(aes(x=ratio,y=error2, color = 'red'))+ylim(0,1)
-
-          
-
-```
-  
-
-### Compute the learning error and test error for different values of the complexity parameter   
- 
-Arguments
-nobs	
-The number of observations in the training set.
-
-mincut	= The minimum number of observations to include in either child node. This is a weighted quantity; the observational weights are used to compute the ‘number’. The default is 5.
-
-minsize	= The smallest allowed node size: a weighted quantity. The default is 10.
-
-mindev	= The within-node deviance must be at least this times that of the root node for the node to be split.
-```{r}
-
-
-computeErrorRate2 = function(categorical.y.name, data, learner, p.learn = 0.8, mindev = 2,...) {
-
-  print(paste("learning a model for ", categorical.y.name, "using mindev = ", mindev))
-
-  indexes.learning = sample(c(1:nrow(data)))[1:(nrow(data)*p.learn)]
-  model = learner(formula(paste0(categorical.y.name,"~.")), data[indexes.learning,], ...)
-
-  predicted.y.learning = predict(model, data[indexes.learning, ], type="class")
-  errors.learning <- data[indexes.learning,] %>% 
-    select(categorical.y.name) %>% 
-    mutate(ph = predicted.y.learning) %>%
-    mutate(err = (categorical.y.name = ph)) %>% 
-    filter(err == TRUE) %>% 
-    nrow()/length(predicted.y.learning)
-  
-  predicted.y.test = predict(model, data[-indexes.learning, ], type="class")
-  errors.test <- data[-indexes.learning,] %>% 
-    select(categorical.y.name) %>% 
-    mutate(ph = predicted.y.test) %>%
-    mutate(err = (categorical.y.name = ph)) %>% 
-    filter(err == TRUE) %>% 
-    nrow()/length(predicted.y.test)
-  
-  return(c(errors.learning,errors.test))
-  
-}
-
-# mindevs = seq(0, 1, .1)
-# error1 = mindevs %>% map_dbl(function(r){computeErrorRate2("isHealthy", data, tree, 0.8, mindev = mindevs, minsize = 1  )[1]})
-# error2 = mindevs %>% map_dbl(function(r){computeErrorRate2("isHealthy", data, tree, 0.8, mindev = mindevs, minsize = 1   )[2]})
-# 
-# ddddd <- tibble(mindevs = mindevs, error1=error1, error2=error2)
-# 
-# ddddd %>%  ggplot()+geom_line(aes(x=mindevs,y=error1, color = 'blue'))+geom_line(aes(x=mindevs,y=error2, color = 'red'))+ylim(0,1)
-
-```
-
-
-```{r}
-
-p.learn <- .8
-indexes.learning = sample(c(1:nrow(data)))[1:(nrow(data)*p.learn)]
-
-df <- tibble(i=0, n=0, el=0, et=0) %>% head(0)
-
-# i = mincut The minimum number of observations to include in either child node. This is a weighted quantity; the observational weights are used to compute the ‘number’. The default is 5. we start from a very high value i.e. short trees and develop the tree up to mincut = 1
-
-for(i in seq(150,1,-1)){
-  model <- tree(isHealthy~.,data, subset = indexes.learning, mincut = i , mindev=.005) #1,200,10
-        
-  predicted.learn = predict(model, data[indexes.learning,], type = "class")
-  predicted.test  = predict(model, data[-indexes.learning,], type = "class")
-  errors.learn <- tibble (L = predicted.learn, D = data[indexes.learning,]$isHealthy) %>% 
-                mutate(err = (L != D)) 
-  errors.test <- tibble  (T = predicted.test, D = data[-indexes.learning,]$isHealthy) %>% 
-                mutate(err = (T != D))  
-  
-  err.rate.learning <- errors.learn %>% filter(err == TRUE) %>% nrow()/length(predicted.learn)
-  err.rate.test <-     errors.test  %>% filter(err == TRUE) %>% nrow()/length(predicted.test)
-  number.of.nodes = nrow(model$frame)
-  #print(paste(i, number.of.nodes,err.rate.learning, err.rate.test))
-  df <- df %>% add_row(i = i , n=number.of.nodes,el=round(err.rate.learning,3), et = round(err.rate.test,3))
-}
-
-plot1 <- df %>% filter(i>1)%>%ggplot()+
-  geom_line(aes(x = n, y=el, color='green'))+  
-  geom_line(aes(x = n, y=et, color='blue'))
-plot1
-# plot2 <- df %>% filter(i>1)%>%ggplot()+
-#   geom_line(aes(x = i, y=el, color='green'))+  
-#   geom_line(aes(x = i, y=et, color='blue'))
-# ggarrange(plot1,plot2)
-# 
-# mins = df %>% group_by(et) %>% slice(which.min(et))
-# 
-# print(paste("minimum error for i = ", mins$i[1], "tree composed of ", mins$n[1], "nodes, error on test data = ", mins$et[1]))
-
-```
-
+## Compute the learning error and test error for different values of the complexity parameter   
 ## k-fold cross validation for error estimate
 
 How will themodel perform on “unseen data”? can the learner generalize beyond available data? The classification error is an appropriate indicator. But the error depends on a random choice of learn and test data. We need to have a more stable value, so we introduce k-fold cross validation on the whole dataset. 
@@ -689,113 +429,29 @@ How will themodel perform on “unseen data”? can the learner generalize beyon
 3. average the k classification errors
 
 
-# stratified k-fold CV using dplyr, 
-
-```{r}
-
-
-p.learn <- .8
-indexes.learning = sample(c(1:nrow(data)))[1:(nrow(data)*p.learn)]
-test_data <- data[-indexes.learning,]
-learn_data <- data[indexes.learning,]
-k_folds = 10
-
-learn_data <- learn_data %>% 
-  group_by(isHealthy) %>%
-  sample_frac(1) %>%
-  mutate(fold=rep(1:k_folds, length.out=n())) %>%
-  ungroup
-
-errors = tibble(f = 0, err = 0) %>% head(0)
-
-mincut = 10 
-minsize = i*2
-
-for(i in 1:k_folds){
-  data.kth.fold <- learn_data %>% filter(fold==i) 
-  data.other.folds <- learn_data %>% filter(fold!=i)
-  
-  # learn on  data.other.folds
-  model <- tree(isHealthy~.,data, subset = indexes.learning, mincut = i , minsize = i*2)  
-  # estimate learn error on data.other.folds
-  predicted.learn = predict(model, data[indexes.learning,], type = "class")
-  errors.learn <- tibble (L = predicted.learn, D = data[indexes.learning,]$isHealthy) %>% 
-                mutate(err = (L != D)) 
-  # estimate test error on  data.kth.fold 
-  predicted.test  = predict(model, data[-indexes.learning,], type = "class")
-  errors.test <- tibble  (T = predicted.test, D = data[-indexes.learning,]$isHealthy) %>% 
-                mutate(err = (T != D))  
-  
-  err.rate.learning <- errors.learn %>% filter(err == TRUE) %>% nrow()/length(predicted.learn)
-  err.rate.test <-     errors.test  %>% filter(err == TRUE) %>% nrow()/length(predicted.test)
-  number.of.nodes = nrow(model$frame)
-  #print(paste(i, number.of.nodes,err.rate.learning, err.rate.test))
-  df <- df %>% add_row(i = i , n=number.of.nodes,el=round(err.rate.learning,3), et = round(err.rate.test,3))
-  
-  # compute classification error on unseen data.kth.fold
-  class.err = 1
-  errors <-  errors %>% add_row(f = i , err = round(class.err,3))
-
-
-}
-
-# average the k classification errors
-mean(errors$err)
-
-```
-
-
-```{r}
-
-
-```
-
-## Pruning
-
-## Random Forrest
  
-## Conclusions
-
-
-
-## k-fold cross validation for error estimate
-
-How will themodel perform on “unseen data”? can the learner generalize beyond available data? The classification error is an appropriate indicator. But the error depends on a random choice of learn and test data. We need to have a more stable value, so we introduce k-fold cross validation on the whole dataset. 
-
-1. split learning data (X and y) in k equal slices (each of n k observations)
-2. for each split (i.e., each i in {1, . . . , k} )
-  2.1 learn on all but k-th slice
-  2.2 compute classification error on unseen k-th slice
-3. average the k classification errors
-
-
-## mean error estimation using stratified k-fold CV  
+ 
 
 ```{r}
 
 library(rpart)
 
-
-
-compute.Kfold.error <- function(data,  k_folds=10, mincut) {
+compute.Kfold.error <- function(data,  k_folds=10, minsplit) {
   data_f <- data %>% 
     group_by(isHealthy) %>%
     sample_frac(1) %>%
     mutate(fold=rep(1:k_folds, length.out=n())) %>%
     ungroup
   
-  fold.errors = tibble(f = NA, err.learn = NA, err.test = NA,  n = NA, mincut = NA) %>% head(0)
+  fold.errors = tibble(f = NA, err.learn = NA, err.test = NA,  n = NA, minsplit = NA) %>% head(0)
 
-  
   for(i in 1:k_folds){
 
     data.kth.fold <- data_f %>% filter(fold==i) 
     data.other.folds <- data_f %>% filter(fold!=i)
     
     # learn on  data.other.folds
-    ##model <- tree(isHealthy~.,data.other.folds, mincut = mincut,mindev = mindev ) 
-    
-    model <- rpart(  isHealthy~.,data.other.folds,method = "class", minsplit = mincut, minbucket = 1, cp = -1)
+    model <- rpart(  isHealthy~.,data.other.folds,method = "class", minsplit = mspl, minbucket = 1, cp = -1)
     number.of.nodes = nrow(model$frame)
   
     # estimate learn error on data.other.folds
@@ -813,44 +469,109 @@ compute.Kfold.error <- function(data,  k_folds=10, mincut) {
   
     #save results
     fold.errors <-  fold.errors %>% 
-      add_row(f = i , err.learn = err.rate.learning, err.test = err.rate.test,   n = number.of.nodes, mincut = mincut)
+    add_row(f = i , err.learn = err.rate.learning, err.test = err.rate.test,   n = number.of.nodes, minsplit = mspl)
 
 
   }
-  fold.errors <- fold.errors %>% group_by(mincut) %>% 
+
+  fold.errors <- fold.errors %>% group_by(minsplit) %>% 
   summarize(err.learn = mean(err.learn), err.test = mean(err.test), n = mean(n) )
   return(fold.errors)
 }
-
-
-k_folds=10
-maxmc = 120
-errors = tibble(err.learn = NA, err.test = NA,  n = NA, mincut = NA) %>% head(0)
-
-for (mc in seq(maxmc,2,-1)){
- errors <- errors %>% bind_rows(compute.Kfold.error(data,  k_folds=k_folds, mincut=mc ))
-}
-
-print(errors)
-
-# # average the k classification errors
-# mean.errors <- errors %>% group_by( mincut)%>% 
-#   summarize(mL = mean(err.learn), mT = mean(err.test), n = mean(n) ) 
-
-#plot using a tidy data structure to represent data and legend:  gather (or pivot_longer) to bring all the data into one column and then use group and colour mappings in the aesthetic.
- 
-data.to.plot <- errors %>% 
-  mutate(tree.size = n)%>% select(-n) %>%
-  gather(error.type, error.value,  c( err.test, err.learn)) %>%
-  mutate(complexity = (maxmc-mincut)/maxmc)
-
-plot1 <- data.to.plot  %>% ggplot( ) + theme_minimal()+
-  geom_line(aes(x=complexity, y = error.value, group = error.type, colour = error.type))
-
-plot1
- 
 ```
 
+ 
+
+Here we start with nested CV cycles:
+
+
+```{r}
+require(rpart)
+
+#splot train and test data 
+fraction = .8
+indexes.learning = sample(c(1:nrow(data)))[1:(nrow(data)*fraction)]
+data.learn  <- data %>% slice(indexes.learning) 
+data.test <- data %>% slice(-indexes.learning)
+
+minsplit_candidates = seq(100,1,-2)
+m = length(minsplit_candidates)
+maxms=max(minsplit_candidates)
+
+k_folds_testing=10
+k_folds_tuning=10
+
+errors1 <- tibble(i=NA , err=NA, number.of.nodes=NA, minsplit=NA) %>% head(0)
+plots   <- tibble()
+
+for(i in 1:k_folds_testing){
+
+  #initialize empty tibble for errors
+  errors2 = tibble(err.learn = NA, err.test = NA,  n = NA, minsplit = NA) %>% head(0)
+
+  # loop to calculate errors for all minsplit candidates
+  for (mspl in minsplit_candidates){
+    errors2 <- errors2 %>% bind_rows(compute.Kfold.error(data.learn,  k_folds=k_folds_tuning, minsplit=mspl ))
+  }
+ # choose the optimal value of mspl
+  
+ data.to.plot <- errors2 %>% 
+   mutate(tree.size = n)%>% select(-n) %>%
+   gather(error.type, error.value,  c( err.test, err.learn)) %>%
+   mutate(complexity = (maxms-minsplit)/maxms)%>%
+   mutate(i=i)
+ 
+ #save errors for plots at the end of the cycle
+ plots <- plots %>% rbind(plots, tibble(rep(i, nrow(errors2)), errors2$err.test, errors2$err.learn))
+ 
+ print(ggplot( data.to.plot) + theme_minimal()+
+  geom_line(aes(x=complexity, y = error.value, group = error.type, colour = error.type)))
+
+ best = errors2 %>% arrange(err.test) %>% head(1)
+ mspl.star = best$minsplit[1]
+ print(mspl.star)
+
+ #tune model with optimal value
+ 
+ opt.model <- rpart(  isHealthy~.,data.learn, method = "class", minsplit = mspl.star, minbucket = 1, cp = -1)
+ opt.number.of.nodes = nrow(model$frame)
+  
+    # estimate learn error on data.other.folds
+ opt.predicted = predict(opt.model, data.test, type = "class")
+ opt.errors <- tibble (L = opt.predicted, D = data.test$isHealthy) %>% 
+                  mutate(err = (L != D)) 
+    
+ opt.err <- opt.errors %>% 
+   filter(err == TRUE) %>% 
+   nrow() 
+ 
+ #save results
+ errors1 <-  errors1 %>% 
+   add_row(i = i , err = opt.err, number.of.nodes = opt.number.of.nodes, minsplit = mspl.star)
+
+}
+
+errors1  
+
+
+
+
+```
+
+
+
+
+
+```{r}
+plots$complexity
+
+
+
+```
+
+
+
+```
 
 
 ```{r}
@@ -904,4 +625,7 @@ library(RColorBrewer)
 
 # plot mytree
 ```
+
+
+
 

@@ -7,7 +7,7 @@ output: pdf_document
 
 
 # Scope and objectives  
-This collection of notebooks presents some excercises for the course "introduction to machine learning". 
+This collection of notebooks is an excercise for the course "introduction to machine learning" and at the same time, a case study for Area Science Park in the frmare of Innovation Intelligence FVG project. 
 
 ## Background information: 
 Research, innovation and highly skilled people are considered to be important factors in economic and social development. Economic support policies often include funds to support research (for example with the creation of public research infrastructures), companies (for example with tenders to co-finance innovative projects) and the training of people with the necessary skills.
@@ -22,7 +22,7 @@ The core result of Innovation Intelligence FVG is a dataset containing informati
 
 ## Objective
 
-The  objective of this project is to introduce more advanced analysis techniques based on the data available, and to test the potential replacement "financial ratings" with freeo or less expansive data sorucs.
+The  objective of this project is to introduce more advanced analysis techniques based on the data available, and to test the potential replacement "financial ratings" with free or less expensive data soruces.
 
 ## Case study
 The new analysis techniques should be focused on the following case study: RPM the association of plastic material processing companies, that counts over 1000 associates (companies that have their head office or a local unit in Friuli Venezia Giulia and are interested in some way in manufacturing with plastic materials).  RPM is monitoring the performance of its members, assigning each company a performance level (Top/Mid/Low) that is used for further activities (e.g. Top performers are featured in the newsletter, Mid and Low performers receive different proposals…). The classification is currently based on financial ratings (a numeric variable in range 1 to 10):
