@@ -1,0 +1,94 @@
+---
+title: "benchmarking with other methods"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+
+```{r}
+require(caret)
+
+```
+
+
+* upload and prepare data with the main notebook
+* this notebook compare results obtained with other algorihms
+
+
+# rpart (optimizing cp)
+```{r}
+# caret can tune only cp (not minsplit)
+model2 <- train(
+  isTop ~., data = data, method = "rpart",
+    trControl = trainControl("cv", number = 10),
+  tuneLength = 10
+  )
+# Plot model accuracy vs different values of
+# cp (complexity parameter)
+plot(model2)
+
+model2
+model2$bestTune
+# Plot the final tree model
+plot(model2$finalModel)
+```
+
+
+# random forrest
+```{r}
+model2 <- train(
+  isTop ~., data = data, method = "rf",
+    trControl = trainControl("cv", number = 10),
+  tuneLength = 10
+  )
+# Plot model accuracy vs different values of
+# cp (complexity parameter)
+plot(model2)
+
+model2
+model2$bestTune
+# Plot the final tree model
+plot(model2$finalModel)
+```
+
+
+# Naive Bayes
+```{r}
+model.nb <- train(isTop ~., data = data, method = "nb",
+    trControl = trainControl("cv", number = 10),tuneLength = 10)
+plot(model.nb)
+model.nb$bestTune
+plot(model.nb$finalModel)
+model.nb
+```
+
+
+# K nearest neigbours
+
+```{r}
+model2 <- train(
+  isTop ~., data = data.learn, method = "knn",
+    trControl = trainControl("cv", number = 10),
+  tuneLength = 10
+  )
+plot(model2)
+model2
+model2$bestTune
+test_pred <- predict(model2, newdata = data.test)
+test_pred
+confusionMatrix(test_pred , data.test$isTop)
+```
+
+#SVM
+
+```{r}
+trctrl <- trainControl(method = "repeatedcv", number = 3, repeats = 3)
+modelsvm <- train(isTop ~., data = data, method = "svmRadial", #svmLinear",
+                 trControl=trctrl,
+                 tuneLength = 3)
+modelsvm
+
+# https://dataaspirant.com/support-vector-machine-classifier-implementation-r-caret-package/#:~:text=The%20R%20programming%20machine%20learning%20caret%20package%20%28Classification,It%20is%20similar%20to%20sklearn%20library%20in%20python.
+```
+

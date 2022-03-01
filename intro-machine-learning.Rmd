@@ -1,14 +1,20 @@
 --- 
-title: 'A Machine Learning approach to classification of companies'
+title: "A Machine Learning approach to classification of companies"
 author: "Fabio Morea"
 date: "`r Sys.Date()`"
-output: 
+output:
+  word_document:
+    toc: yes
+    toc_depth: '2'
   pdf_document:
-    toc: true
+    toc: yes
     toc_depth: 2
-    fig_width: 6 
+    fig_width: 6
     fig_height: 3
 ---
+
+
+Abstract: This notebook is an exercise for the course *introduction to machine learning* and, at the same time, a case study for Area Science Park in the frame of Innovation Intelligence FVG project. The notebook demonstrates the use of a binary classifier to predict whether a company has a "high" financial rating, according to different definition of the label with varying degree of inbalance. The assessment is performed on a dataset of companies in manufacturing sector in Friuli Venezia Glilia.
 
 \newpage
 
@@ -37,9 +43,9 @@ define a ML model to identifying "Top performers" among companies working in the
 
 The classification of "Top performers" is currently based on financial ratings (a numeric variable in range 1 to 10) and assegned as follows:
 
-* Top: rating 9 to 10
-* Mid: rating 5 to 8
-* Low: rating 1 to 4
+* Top:  financial rating equal or greater than 9, a srongly unbalanced dataset representing generally less than 10% of the companies
+* High: financial rating equal or greater than 8, generally representing one quarter of the companies
+* Healty: financial rating above 7, a balanced distribution representing generally half of the companies.
 
 The performance class is assigned to each company, and used for further activities (e.g. Top performers are featured in the newsletter, Mid and Low performers are the target of a questionnaire…). 
 
@@ -70,7 +76,9 @@ No attributes were removed or summarized during pre-processing. Pre-processing i
 
 
 ```{r , error=FALSE, warning=FALSE, message=FALSE}
+
 pathTidyData = './../../_data/tidy/'
+
 ```
 
 Original and tidy data are updated on a monthly basis; the current version in based on June 2021 version and does not provide automatic updating. 
@@ -99,16 +107,6 @@ The objective is to show that a binary classification tree can predict $y$ with 
 - dataset composed of at least 100 observations, homogeneous by sector and type
 - computation time < 1 hour on a state-of-the art personal computer.
 
-## Indexes for measuring the solutions
-
-The solution will be assessed by a single index: $accuracy$ i.e. the proportion of correct predictions (both true positives and true negatives) among the total number of cases examined. 
-
-The **target value** is set to $$accuracy > 0.90$$.  
-
-The threshold may seem relatively high compared if compared to safety-critical applications, but is sufficient for the business case and in line with similar cases of binary classification of company performance found in scientific literature. 
-
-The proposed solution and the indicator are a tradeoff between complexity and explainability: for the purpose of this feasibility study, explainability and interpretability are to be preferred on complexity, but more complex methods may be used as outlined in the final section of this notebook. 
-
 ## Proposed solution
 
 We consider a supervised binary classification approach, in which a company has to be classified as Top Performer using a *binary decision tree*. 
@@ -135,7 +133,15 @@ The proposed solution consists of 3 phases:
 2) **learning phase**: generate a first instance of the decision tree, visualize the structure and evaluate its performance 
 3) **optimization**: tune the tree parameters to achieve optimal performance on test data.
 
+## Indexes for measuring the solutions
 
+The solution will be assessed by a single index: $accuracy$ i.e. the proportion of correct predictions (both true positives and true negatives) among the total number of cases examined. 
+
+The **target value** is set to $$accuracy > 0.90$$.  
+
+The threshold may seem relatively high compared if compared to safety-critical applications, but is sufficient for the business case and in line with similar cases of binary classification of company performance found in scientific literature. 
+
+The proposed solution and the indicator are a tradeoff between complexity and explainability: for the purpose of this feasibility study, explainability and interpretability are to be preferred on complexity, but more complex methods may be used as outlined in the final section of this notebook. 
 
 ## Pre-processing: data exploration and feature engineering 
 
@@ -193,30 +199,30 @@ Each company can be associated with one or more NACE codes, that may be differen
 
 The selected sample is composed of companies that have at least one NACE code in one of the following Divisions: 22 (Manufacture of rubber and plastic products), 23 (Manufacture of other non-metallic mineral products), 24 (Manufacture of basic metals), 25 (Manufacture of fabricated metal products, except machinery and equipment), 26 (Manufacture of computer, electronic and optical products), 27 (Manufacture of electrical equipment) and 28 (Manufacture of machinery and equipment).
 
+Some filters are applied: time-dependent data (such as balaance sheet data, rating and employees folws) are filtered to year 2019, and company age (years in business) is filtered to anly value greater than 1.
+
 ```{r, error=FALSE, warning=FALSE, message=FALSE}
-divs = c( 22,23,24,25,26,27,28, 29, 30, 31)
-#divs = c( 22,23,24,25)
+divs = c( 22,23,24,25,26,27,28)
+selectedCf <- codes %>% filter(division %in% divs) %>% select(cf) 
 
-
-selectedCf <- codes %>% filter(division %in% divs) %>% select(cf)
-#semi_join() return all rows from first table with a match in second table
-companies  <- companies %>% semi_join(selectedCf) 
+#semi_join() returns all rows from first table with a match in second table
+companies  <- companies %>% semi_join(selectedCf) %>% filter(yearsInBusiness > 1)
 bsd        <- bsd       %>% semi_join(selectedCf) %>% filter(year == 2019) 
 rating     <- rating    %>% semi_join(selectedCf) %>% filter(year == 2019) 
 
+#employees folws summarized by company
 empl.flows <- empl.flows%>% semi_join(selectedCf) %>% filter(year == 2019) %>%
   group_by(cf)%>% summarise(staffTurnover = sum(turnover), staffBalance = sum(balance))
 
+# employees stock summarized by company and filtered (stock in [1..999])
 empl.stock <- empl.stock%>% semi_join(selectedCf) %>%
   group_by(cf)%>% summarise(StockAll=max(StockAll)) %>%
   filter(StockAll > 0) %>% filter(StockAll < 1000) 
-
 ```
 
-Now we have a sample of `r length(companies)` companies. We can create the dataset X with the relevant features, filter.
+The feature matrix X can be created by joining the tibbles on a company identifier (cf), selecting relevant features and mutating boolean variables into factors. 
 
 ```{r error=FALSE, warning=FALSE, message=FALSE}
-
 companies <- companies %>% 
        inner_join(bsd, by = "cf") %>% 
        inner_join(rating, by = "cf") %>% 
@@ -225,20 +231,20 @@ companies <- companies %>%
 
 X <- companies %>% select(idCompany, is.sme, is.startup, is.fem, is.young,  
   yearsInBusiness,staffTurnover, staffBalance, StockAll, 
-  totAssets, totEquity, totIntang, 
-  accounts, debts,ammort, deprec,prod,revenues, personnel,
-  valCost,profLoss, valAdded, noi) %>%
+  totAssets, totEquity, totIntang,  accounts, debts,ammort, deprec,prod,revenues, 
+  personnel,  valCost,profLoss, valAdded, noi) %>%
   mutate(is.sme = factor(is.sme)) %>%
   mutate(is.startup = factor(is.startup)) %>%
   mutate(is.fem  = factor(is.fem)) %>%
   mutate(is.young = factor(is.young)) %>% 
-  filter(yearsInBusiness > 1) %>%
+  mutate(idCompany = factor(idCompany)) %>% 
+
   na.omit()
 
 X %>% write.csv(file = "X.csv",row.names = FALSE) #save data for future applications
 
-
 ```
+
 
 ### Labels based on financial ratings
 
@@ -249,8 +255,9 @@ Financial rating is a numerical variable ranging from 1 to 10, where low values 
 ```{r error=FALSE, warning=FALSE, message=FALSE}
 ys <-companies %>% 
   mutate(isTop9 = (rating010 >=9))  %>% 
-  mutate(isTop8 = (rating010 >=8)&(staffBalance >0))  %>% 
-  mutate(isTop7 = (rating010 >=7)&(staffBalance >0)&(profLoss>100000))  %>% 
+  mutate(isTop8 = (rating010 >=8)) %>% 
+  mutate(isTop7 = (rating010 >=7))%>%  
+  mutate(idCompany = as.factor(idCompany))%>%
   select(idCompany,isTop9, isTop8, isTop7)
 
 ys %>%  write.csv(file = "y.csv",row.names = FALSE) #save data for future applications
@@ -262,30 +269,82 @@ proportions <- ys %>% pivot_longer(cols=c(isTop9, isTop8, isTop7)) %>%
 proportions %>% print()
 ```
 
-The three labels are TRUE for a suitable proportion of the dataset (6.7% to 14.6%).
 
-```{r}
+```{r, echo=FALSE}
 proportions %>% pivot_longer(-c(name), names_to = "type", values_to = "value") %>%
   ggplot(aes(x = name, y =value, fill=type))+
   geom_bar(, stat = "identity", position = position_fill(reverse = TRUE)) +
   scale_fill_manual("legend", values = c( "top" = "green","others" = "gray")) + 
   ylab("") + scale_y_continuous(labels = scales::percent) 
 ```
+The table and figure above shows that the selected labels `isTop7`, `isTop8` and `isTop9`, lie within the expected range.
 
 ### Feature engineering
-The objective of feature engineering is to build a dataset $data$ that contains all relevant variables for learning and prediction, appropriately scaled, in the form of a matrix. In this phase we will focus on the label isTop9 (other labels will be used in the optimization phase).
+The objective of feature engineering is to build a dataset $that contains a set of relevant variables for learning and prediction, appropriately scaled, in the form of a matrix. 
+Specifically we will focus on calculating new features based on domain knowledge, checking variable correlation and normalizing the selected features by centering and scaleing.
 
-```{r}
-y <- ys %>% mutate(isTop = as.factor(isTop9)) %>%
-  select(idCompany,isTop)
+The original features are higly correlated, as higlighted in the following correlation matrix.  
+```{r, , error=FALSE, warning=FALSE, message=FALSE}
+cm <- X %>% select(where(is.numeric), -idCompany) %>% cor() 
+cm %>% corrplot( tl.col = "brown", tl.srt = 30, bg = "White",title = "",type = "lower")
 ```
 
-The rpart library requires a dataset in the form of a single table, that can be obtained joining X and y. The company identifier can be removed at this stage, since it carries no information on the company and may only lead to overfitting. 
+Moreover, featur values range over different orders of magnitude (company age ranges from 1 to 150, while total assets ranges from 0 to $10^9$€).
 
-```{r , error=FALSE, warning=FALSE, message=FALSE}
-data <- X %>% inner_join(y) %>% select(-idCompany)
+```{r echo=FALSE}
+X <- X %>% select(idCompany, totAssets,totEquity, noi,personnel,prod, debts,deprec,valCost,totIntang, revenues,valAdded,yearsInBusiness, staffTurnover, staffBalance, StockAll) %>% na.omit()
+ggplot(stack(X), aes(x = ind, y = values)) +
+ stat_boxplot(geom = "errorbar", width = 0.5) +
+ labs(x="", y="original features") +
+ geom_boxplot(fill = "white", colour = "black") + coord_flip()
 ```
-The dataset is composed of n = `r nrow(data)` observations and p = `r ncol(data)` features (namely: `r names(data)` ). There meaning of variables is  self explanatory in some cases, but economic features need to be explicitly mentioned:  
+
+We can tackle both issues by calculating new features that scale economic values to the company size, a common practice in economi analusys, that allows direct comparison of company performance regardless of comapny size. the rev features are named 'rel*' as they are scaled to the total assets (totAssets) or the total number of employees (StockAll) of each company.
+```{r error=FALSE, warning=FALSE, message=FALSE}
+X <- X %>% 
+    mutate(relInt =   totIntang/totAssets*5) %>%
+    mutate(relEquity = totEquity/totAssets) %>%
+    mutate(relreve   = revenues/totAssets) %>%
+    mutate(relNoi    = noi/totAssets) %>%
+    mutate(relPers   = personnel/totAssets) %>%
+    mutate(relDebts  = debts/totAssets) %>%
+    mutate(relDeprec = deprec/totAssets*5) %>%
+    mutate(yearsInBusiness = yearsInBusiness)  %>%
+    mutate(relStaffTurnover = staffTurnover/StockAll) %>%
+    mutate(relStaffBalance  = staffBalance/StockAll) %>%
+    mutate(VAS  = valAdded/StockAll) %>%
+    mutate(logStaff  = log10(StockAll)) %>%
+    select(-totAssets,-totEquity, -noi,-personnel,-debts,-prod,
+          -deprec,-revenues,-valCost,-totIntang,-valAdded,
+          -StockAll, -staffTurnover, -staffBalance)%>% na.omit()
+```
+
+Correlation between the new features has significantly improved, as shown in the correlation matrix below.  
+```{r error=FALSE, warning=FALSE, message=FALSE}
+cm <- X %>% select(where(is.numeric)) %>% cor() 
+cm %>% corrplot( tl.col = "brown", tl.srt = 30, bg = "White", type = "lower")
+ 
+#value of the minimun correlation coefficient: red dot in the plot
+cm %>% as_tibble %>% select(relDebts) %>% min()
+X <-X %>% select(-relDebts)
+```
+
+Keeping only the new features, the dataset consists of n = `r nrow(data)` observations and p = `r ncol(data)` features (namely: `r names(data)` ). 
+
+The next step is to normalize (center and rescale) numeric features to the a similar range in order to improve the performance of the learning algorithm. 
+
+```{r error=FALSE, warning=FALSE, message=FALSE}
+X <- X %>% mutate(across(is.numeric, ~ as.numeric(scale(.)))) 
+```
+
+```{r, echo = FALSE}
+
+X %>%  select(-idCompany)  %>% stack() %>% ggplot(aes(x = ind, y = values)) +
+ stat_boxplot(geom = "errorbar", width = 0.5) +
+ labs(x="", y="normalized features") +
+ geom_boxplot(fill = "light blue", colour = "black") + coord_flip()  +  scale_y_continuous(  limit = c(-3, 3)) + geom_hline(yintercept=0, color = "red")
+```
+All features are of the same order of magnitude. The dataset is composed of n = `r nrow(data)` observations and p = `r ncol(data)` features (namely: `r names(data)` ). There meaning of variables is  self explanatory in some cases, but economic features may require an explanation:  
 
 - totAssess: totale attivo = total assets
 - noi: RON Reddito Operativo Nnetto = NOI Net Operating Income
@@ -302,72 +361,34 @@ The dataset is composed of n = `r nrow(data)` observations and p = `r ncol(data)
 - valAdded: valore aggiunto = value added
 - deprec: tot.aam.acc.svalutazioni = total amortisation, depreciation and write-downs
 
-We can check multycollinearity issues by plotting a correlation plot. Several features have a high correlation that should be avoided. 
-```{r}
-cm <- X %>% select(where(is.numeric), -idCompany) %>% cor() 
-cm %>% corrplot( tl.col = "brown", tl.srt = 30, bg = "White",title = "",type = "lower")
-```
 
+## Learning a Binary Classification Tree
 
-```{r error=FALSE, warning=FALSE, message=FALSE}
-data <- data %>% select(totAssets,totEquity, noi,personnel,prod, debts,deprec,valCost,totIntang, revenues,valAdded,yearsInBusiness,is.startup, is.fem, isTop, staffTurnover, staffBalance, StockAll) %>% na.omit()
-ggplot(stack(data), aes(x = ind, y = values)) +
- stat_boxplot(geom = "errorbar", width = 0.5) +
- labs(x="", y="original features") +
- geom_boxplot(fill = "white", colour = "black") + coord_flip()
-```
+The proposed solution is to learn "Binary Classification Tree" and tune the model to achieve the expcted performance. The solution can be implemented using the two usual blocks:
+- a function for learning the model `rpart()`
+- a function for prediction `predict()`
 
-Since the size of company varies greatly within the dataset, performance can be compared using economic indicators scaled to the total assets (totAssets) or the total number of employees (StockAll) of each company. 
+The learning function in `rpart()` requires data in the form of a matrix (a data.frame or a tibble) and instructions on which features should be predicted, expressed as a *formula*. In our case the formula used for all trees is  `isTop ~ .` which stands for "*feature `isTop` depends on all the other variables*".
 
-
-```{r error=FALSE, warning=FALSE, message=FALSE}
-data <- data %>% 
-    mutate(relInt =   totIntang/totAssets*5) %>%
-    mutate(relEquity = totEquity/totAssets) %>%
-    mutate(relreve   = revenues/totAssets) %>%
-    mutate(relNoi    = noi/totAssets) %>%
-    mutate(relPers   = personnel/totAssets) %>%
-    mutate(relDebts  = debts/totAssets) %>%
-    mutate(relDeprec = deprec/totAssets*5) %>%
-    mutate(yearsInBusiness = yearsInBusiness)  %>%
-    mutate(logStaff  = log10(StockAll)) %>%
-    mutate(relStaffTurnover = staffTurnover/StockAll) %>%
-    mutate(relStaffBalance  = staffBalance/StockAll) %>%
-    mutate(VAS  = valAdded/StockAll) %>%
-   select(-totAssets,-totEquity, -noi,-personnel,-debts,-prod,
-          -deprec,-revenues,-valCost,-totIntang,-valAdded,
-          -StockAll, -staffTurnover, -staffBalance)%>%
-   na.omit()
-
-```
-
-```{r}
-cm <- data %>% select(where(is.numeric)) %>% cor() 
-cm %>% corrplot( tl.col = "brown", tl.srt = 30, bg = "White",
-         title = "", type = "lower")
- 
-#value of the minimun correlation coefficient: red dot in the plot
-cm %>% as_tibble %>% select(relDebts) %>% min() 
-data <-data %>% select(-relDebts)
-
-```
-
-
-Keeping only the new features, the dataset consists of n = `r nrow(data)` observations and p = `r ncol(data)` features (namely: `r names(data)` ). The next step is to normalize (center and rescale) numeric features to the a similar range in order to improve the performance of the learning algorithm. 
-
-```{r}
-data <- data %>% mutate(across(is.numeric, ~ as.numeric(scale(.)))) 
-data %>% stack() %>% ggplot(aes(x = ind, y = values)) +
- stat_boxplot(geom = "errorbar", width = 0.5,outlier.size=.1) +
- labs(x="", y="normalized features") +
- geom_boxplot(fill = "white", colour = "blue") + coord_flip()  +  scale_y_continuous(  limit = c(-3, 3)) + geom_hline(yintercept=0, color = "red")
-```
-
-
-
-All features are of the same order of magnitude, but have not the same predictive power on y label. The decision tree will provide a detailed estimate of each variable, but at this stage we can have a basic idea of the predictive power of each variable by examining the distributions of observations according to the label
+In this phase we will focus on the label `isTop8` (other labels will be used in section 5 for comparison).
 
 ```{r, error=FALSE, warning=FALSE, message=FALSE}
+y <- ys %>% 
+  mutate(isTop = as.factor(isTop8)) %>%
+  select(idCompany,isTop)
+```
+
+The `rpart` library requires a dataset in the form of a single table, that can be obtained joining X and y. The company identifier can be removed at this stage, since it carries no information on the company and may only lead to overfitting. 
+
+```{r , error=FALSE, warning=FALSE, message=FALSE}
+data <- X %>% 
+  inner_join(y) %>% 
+  select(-idCompany)
+```
+
+Features have different same predictive power on y label. The decision tree will provide a detailed estimate of each variable, but at this stage we can have a basic idea of the predictive power of each variable by examining the distributions of observations according to the label
+
+```{r, echo=FALSE, error=FALSE, warning=FALSE, message=FALSE}
 data %>% 
   select(relEquity, relNoi, logStaff, VAS,yearsInBusiness,isTop)%>% 
   pivot_longer(cols=!isTop) %>% ggplot(aes(x=isTop, y=value, color = isTop)) +
@@ -377,39 +398,31 @@ data %>%
 
 Some features, namely *relNoi* (net operative income scaled to total assets), relEquity (total equity scaled to total assets) and VAS (Value Added on total Staff), are clearly separate according to label y9 and can therefore be expected to be good predictors.
 
-## Learning: Binary Classification Trees
-
-The proposed solution is to apply "Binary Classification Trees" and check if the model can be tuned to achieve the expcted performance. The solution can be implemented using the two usual blocks:
-- a function for learning the model `rpart()`
-- a function for prediction `predict()`
-
-The learning function in `rpart()` requires data in the form of a matrix (a data.frame or a tibble) and instructions on which features should be predicted, expressed as a *formula*. In our case the formula used for all trees is  `isTop ~ .` which stands for "*feature `isTop` depends on all the other variables*".
-
 The model complexity and performance will be controlled by a single parameter, minsplit, i.e. the minimum number of observations that must exist in a node in order for a split to be attempted. A high value of minsplit produces simple trees with large terminal nodes (example on the left) while low values of minsplit produces complex trees (example on the right).
 Optimal performance can be achieved selecting an appropriate value of minsplit that produces the best results on test data. Such value will be determined experimentally in the next section of the notebook.
 
 ```{r}
-figures <- par(mfrow=c(1,2)) # more trees in the same figure
-
 #building a simple tree
-parms = rpart.control(split = "gini", minsplit = 100, cp = .02 )
+parms = rpart.control(split = "gini", minsplit = 100 )
 simple.tree <- rpart(isTop~., data, method = "class", control=parms)
-simple.tree %>% rpart.plot(  main="A simple classification tree", shadow.col = "gray")
 
 #building a complex tree
-parms = rpart.control(split = "gini",  minsplit = 20, cp=.01 )
+parms = rpart.control(split = "gini",  minsplit = 20)
 complex.tree <- rpart(isTop~., data, method = "class",control=parms)
-complex.tree %>% rpart.plot(  main="A complex classification tree")
+```
 
+```{r, echo = FALSE}
+figures <- par(mfrow=c(1,2)) # more trees in the same figure
+simple.tree %>% rpart.plot(  main="A simple classification tree", shadow.col = "gray")
+complex.tree %>% rpart.plot(  main="A complex classification tree")
 par(figures)
 ```
 The models exhibit different complexity, accuracy and explainability.
 
-
 ### variable importance 
 The recursive partitioning algorithm calculates the relative importance of each variable to achieve the final predictions. Values vary with data and hyperparameters.
 
-```{r, error=FALSE, warning=FALSE, message=FALSE}
+```{r, echo = FALSE, error=FALSE, warning=FALSE, message=FALSE}
  tibble(features=names(simple.tree$variable.importance) , imp=simple.tree$variable.importance) %>%
   mutate(imp = round(imp,1))%>%
   ggplot(aes(reorder(features, imp, sum), imp))  + coord_flip()+
@@ -425,24 +438,17 @@ Selecting the most predictive variables improves the performance of the algorith
 
 ## Quality of prediction of a single tree
 
-[explain]
-
-- error rate
-- accuracy
-- confusion matrix **confusion matrix** is a table (2x2 in the case of binary classifiers) that shows the number of values classified correctly (on the main diagonal) or misclassifications. 
+The quality of prediction of a single decision tree can be assessed using different parameters such as error rate, accuracy and confusion matrix. A **confusion matrix** is a table (2x2 in the case of binary classifiers) that shows the number of values classified correctly (on the main diagonal) or misclassified (off-diagonal). 
 
 ```{r, error=FALSE, warning=FALSE, message=FALSE}
 computeConfusionMatrix = function(model, data) {
   predicted.y = predict(model, data, type="class")
-  errors <- data %>% 
-    mutate(err = (isTop = predicted.y)) %>% 
-    filter(err == TRUE) %>% nrow()
   return(table(predicted.y, data$isTop))
 }
 ```
 
-
-we might build a function that computes the accuracy:
+Learning and prediction are based a stocastic process (splitting data into learn and test sets), hence the results vary for each sample. In order to evaluate te average performance of the method, we need to assess it over a number of samples using a structured experimental procedure such as k-fold cross validation. 
+The first step is to build a function that computes the accuracy:
 
 ```{r, error=FALSE, warning=FALSE, message=FALSE}
 computeAccuracy =  function(model, data) {
@@ -450,11 +456,9 @@ computeAccuracy =  function(model, data) {
   accuracy <- sum(diag(conf.matrix))/sum(conf.matrix)
   return(round(accuracy,5))
 }
-
 ```
 
-we can use the function as follows TODO: apply to simple and complex tree above (not to another tree!)
-
+Accuracy of the the `simple.tree` can be assessed as in the following example: the tree is trained on data.learn, then performance is assessed on data.test. 
 
 ```{r, error=FALSE, warning=FALSE, message=FALSE}
 #split data into learn and test
@@ -463,9 +467,9 @@ indexes.learning = sample(c(1:nrow(data)))[1:(nrow(data)*p.learn)]
 data.learn = data[ indexes.learning,]
 data.test =  data[-indexes.learning,]
 
-print("Confusion matrix and accurcy of simple tree on learning data:")
-print( computeConfusionMatrix(simple.tree, data.learn) ) 
-print( computeAccuracy(simple.tree, data.learn) )
+#learn simple tree on data.learn
+parms = rpart.control(split = "gini", minsplit = 100, cp = .01 )
+simple.tree <- rpart(isTop~., data.learn, method = "class", control=parms)
 
 print("Confusion matrix and accurcy of simple tree on test data:")
 print( computeConfusionMatrix(simple.tree, data.test ) ) 
@@ -474,15 +478,16 @@ print( computeAccuracy(simple.tree, data.test)  )
 
 The learning and test datasets are definied as a random sample of the data, therefore they are different every time the program is executed. The model (and its performance) vary accordingly. In order to achieve a stable performance assessment we need to repeat the procedure several times, and return the average result.
 
-## Overfitting
-
-How will the model perform on “unseen data”? can the learner generalize beyond available data? The classification error is an appropriate indicator. But the error depends on a random choice of learn and test data. We need to have a more stable value, so we introduce k-fold cross validation on the whole dataset. 
+ [TODO]
+ *How will the model perform on “unseen data”? can the learner generalize beyond available data? 
+The classification error is an appropriate indicator. But the error depends on a random choice of learn and test data. We need to have a more stable value, so we introduce k-fold cross validation on the whole dataset. 
 
 1. split learning data (X and y) in k equal slices (each of n k observations)
 2. for each split (i.e., each i {1, . . . , k} )
   2.1 learn on all but k-th slice
   2.2 compute classification error on unseen k-th slice
 3. average the k classification errors
+*
 
 ```{r, error=FALSE, warning=FALSE, message=FALSE}
 compute.Kfold.accuracy <- function(data,  k_folds=10, minsplit, cp) {
@@ -511,18 +516,19 @@ compute.Kfold.accuracy <- function(data,  k_folds=10, minsplit, cp) {
   return(folds.results)
 }
 ```
-Now we can use the compute.Kfold.accuracy() function to show how accuracy varies in different tests. Accuracy on learning data is higher and more stable, while accuracy on test shows larger variations.
+
+TODO Now we can use the compute.Kfold.accuracy() function to show how accuracy varies in different tests. Accuracy on learning data is higher and more stable, while accuracy on test shows larger variations.
 
 ```{r, error=FALSE, warning=FALSE, message=FALSE}
-folds.results = compute.Kfold.accuracy(data,  k_folds=20, minsplit=1, cp=.01)
+folds.results = compute.Kfold.accuracy(data,  k_folds=20, minsplit=1, cp=.001)
 
 p01 <- ggplot(data = folds.results)+geom_line( aes(x=f, y=ac.learn,color = "learn"))+
-  geom_line( aes(x=f, y=ac.test, color = "test")) + ylim(0.85,1.0)+
+  geom_line( aes(x=f, y=ac.test, color = "test")) +# ylim(0.85,1.0)+
   geom_hline(yintercept = .90, linetype = 'dotted', col = 'red', size=1)+ylab("accuracy")
 
 
 p02 <- folds.results %>% pivot_longer(cols=c(ac.learn, ac.test)) %>% 
-  ggplot(aes(x=name, y=value, color = name))+geom_boxplot()+ ylim(0.85,1.0)+
+  ggplot(aes(x=name, y=value, color = name))+geom_boxplot()+# ylim(0.85,1.0)+
   geom_hline(yintercept = .90, linetype = 'dotted', col = 'red', size=1)+ylab("accuracy")
 
 wrap_plots(p01,p02, guides = 'collect')
@@ -538,7 +544,7 @@ Here we demonstrate a tuning procedure: the graph shows the mean accuracy for ea
 ```{r, error=FALSE, warning=FALSE, message=FALSE}
 tuning.results = tibble() 
 
-for (mspl in seq(1,100,1)){
+for (mspl in seq(1,100,2)){
     tuning.results <- tuning.results %>% 
       bind_rows(compute.Kfold.accuracy(data.learn,  k_folds=10, minsplit=mspl, cp=-1 ))
 }
@@ -548,8 +554,8 @@ tuning.results %>% group_by(minsplit)%>%
   group_by(f)%>%
   ggplot() + theme_minimal()+
   geom_line(aes(x=minsplit, y = ac.test, group = f, colour = 'test')) + 
-  geom_line(aes(x=minsplit, y = ac.learn,group = f, colour = 'learn'))+ 
-  ylim(0.90,1.0)#+geom_hline(yintercept = .90, linetype = 'dotted', col = 'red', size=1)
+  geom_line(aes(x=minsplit, y = ac.learn,group = f, colour = 'learn'))+ylim(0.75,1.0)
+#+geom_hline(yintercept = .90, linetype = 'dotted', col = 'red', size=1)
 ```
 
 
@@ -616,13 +622,15 @@ data.learn <- data %>% slice( indexes.learning)
 data.test  <- data %>% slice(-indexes.learning)
 
 # define the range for minsplit parameter
-minsplit_candidates = seq(1,100,1)
+minsplit_candidates = seq(1,100,2)
 
 #define k-fold validation (computational cost vs quality)
 k_folds_tuning=3
 k_folds_testing=3
-
-optimal.params <- AutoTuneTree(data.learn, data.test, k_folds_testing, k_folds_tuning, minsplit_candidates)
+optimal.params <- AutoTuneTree(data.learn, data.test, 
+                               k_folds_testing, 
+                               k_folds_tuning, 
+                               minsplit_candidates)
 
 ```
 
@@ -646,11 +654,11 @@ rpart.plot(optimal.tree)
 folds.results = compute.Kfold.accuracy(data,  k_folds=10, minsplit=optimal.minsplit, cp=.01)
 
 p_9 <- ggplot(data = folds.results)+geom_line( aes(x=f, y=ac.learn,color = "learn"))+
-  geom_line( aes(x=f, y=ac.test, color = "test")) + ylim(0.90,1.0)+
+  geom_line( aes(x=f, y=ac.test, color = "test")) + ylim(0.70,1.0)+
   geom_hline(yintercept = .90, linetype = 'dotted', col = 'red', size=1)
 
 plot9 <- folds.results %>% pivot_longer(cols=c(ac.learn, ac.test)) %>% 
-  ggplot(aes(x=name, y=value, color = name))+geom_boxplot()+ ylim(0.90,1.0)+
+  ggplot(aes(x=name, y=value, color = name))+geom_boxplot()+ ylim(0.70,1.0)+
   geom_hline(yintercept = .90, linetype = 'dotted', col = 'red', size=1)
 
 wrap_plots(p_9,plot9, guides = 'collect')
@@ -671,21 +679,21 @@ tibble(features=names(optimal.tree$variable.importance) , imp=optimal.tree$varia
 
 Robustness refers to the effectiveness of the algorithm when  tested on the new independent (but similar) datasets. In the other words, the robust algorithm is the one, the testing error of which is close to the training error. 
 
-```{r error=FALSE, warning=FALSE, message=FALSE}
+```{r , error=FALSE, warning=FALSE, message=FALSE}
  
-y8 <- ys %>% mutate(isTop = as.factor(isTop8)) %>%  select(idCompany,isTop)
-data8 <- X %>% inner_join(y8) %>% select(-idCompany)
-data.learn <- data8 %>% slice( indexes.learning) 
-data.test  <- data8 %>% slice(-indexes.learning)
+y9 <- ys %>% mutate(isTop = as.factor(isTop9)) %>%  select(idCompany,isTop)
+data9 <- X %>% inner_join(y9) %>% select(-idCompany)
+data.learn <- data9 %>% slice( indexes.learning) 
+data.test  <- data9 %>% slice(-indexes.learning)
 
-optimal.params8 <- AutoTuneTree(data.learn, data.test, k_folds_testing, k_folds_tuning, minsplit_candidates)
-optimal.minsplit8 <-  optimal.params %>% head(1) %>% select(minsplit) %>% pull
-optimal.tree8 <- rpart( isTop~., 
+optimal.params9 <- AutoTuneTree(data.learn, data.test, k_folds_testing, k_folds_tuning, minsplit_candidates)
+optimal.minsplit9 <-  optimal.params9 %>% head(1) %>% select(minsplit) %>% pull
+optimal.tree9<- rpart( isTop~., 
                         data.learn, 
                         method = "class", 
-                        minsplit = optimal.minsplit8, 
-                        cp = .01)
-rpart.plot(optimal.tree8)
+                        minsplit = optimal.minsplit9, 
+                        cp = -1)
+rpart.plot(optimal.tree9)
 
 y7 <- ys %>% mutate(isTop = as.factor(isTop7)) %>%  select(idCompany,isTop)
 data7 <- X %>% inner_join(y7) %>% select(-idCompany)
@@ -693,12 +701,12 @@ data.learn <- data7 %>% slice( indexes.learning)
 data.test  <- data7 %>% slice(-indexes.learning)
 
 optimal.params7 <- AutoTuneTree(data.learn, data.test, k_folds_testing, k_folds_tuning, minsplit_candidates)
-optimal.minsplit7 <-  optimal.params %>% head(1) %>% select(minsplit) %>% pull
+optimal.minsplit7 <-  optimal.params7 %>% head(1) %>% select(minsplit) %>% pull
 optimal.tree7 <- rpart( isTop~., 
                         data.learn, 
                         method = "class", 
                         minsplit = optimal.minsplit7, 
-                        cp = .01)
+                        cp = -1)
 rpart.plot(optimal.tree7)
 ```
 
@@ -708,25 +716,25 @@ rpart.plot(optimal.tree7)
 
 
 ```{r}
-folds.results7 <- compute.Kfold.accuracy(data7,  k_folds=10, minsplit=optimal.minsplit7, cp=.01)
+folds.results7 <- compute.Kfold.accuracy(data7,  k_folds=10, minsplit=optimal.minsplit7, cp= -1)
 plot7 <- folds.results7 %>% pivot_longer(cols=c(ac.learn, ac.test)) %>% 
   mutate(dataset =name, accuracy = value)%>%
   ggplot(aes(x=dataset, y=accuracy, color = dataset))+geom_boxplot()+ ylim(0.8,1.0)+
   geom_hline(yintercept = .90, linetype = 'dotted', col = 'red', size=1) +
   labs(title = "y7") + xlab("")
 
-folds.results8 <- compute.Kfold.accuracy(data8,  k_folds=10, minsplit=optimal.minsplit8, cp=.01)
-plot8 <- folds.results8 %>% pivot_longer(cols=c(ac.learn, ac.test)) %>% 
+folds.results9 <- compute.Kfold.accuracy(data9,  k_folds=10, minsplit=optimal.minsplit9, cp= -1)
+plot9 <- folds.results9 %>% pivot_longer(cols=c(ac.learn, ac.test)) %>% 
   mutate(dataset =name, accuracy = value)%>%
   ggplot(aes(x=dataset, y=accuracy, color = dataset))+geom_boxplot()+ ylim(0.8,1.0)+
   geom_hline(yintercept = .90, linetype = 'dotted', col = 'red', size=1) +
-  labs(title = "y8")+ xlab("")+ ylab("")
+  labs(title = "y9")+ xlab("")+ ylab("")
 
-plot9 <- folds.results %>% pivot_longer(cols=c(ac.learn, ac.test)) %>% 
+plot8 <- folds.results %>% pivot_longer(cols=c(ac.learn, ac.test)) %>% 
   mutate(dataset =name, accuracy = value)%>%
   ggplot(aes(x=dataset, y=accuracy, color = dataset))+geom_boxplot()+ ylim(.8,1.0)+ 
   geom_hline(yintercept = .90, linetype = 'dotted', col = 'red', size=1)   +
-  labs(title = "y9")+ xlab("") + ylab("")
+  labs(title = "y8")+ xlab("") + ylab("")
 
 
 wrap_plots(plot7,plot8,plot9, guides = 'collect') 
@@ -734,8 +742,10 @@ wrap_plots(plot7,plot8,plot9, guides = 'collect')
 
 
 ```
-
-A wider definition of the label y results in a lower quality of predictions, still above the selected threshold accuracy > 0.90, with a much more complex mode.
+[TODO]
+Predictions on y7 are below the treshold
+**Predictions on y8 and y9 are above accuracy, but exibith a low Kappa. This is an xample of the accuracy paradox, where most of the predictions are assigned to the majority class. The error on minority class does not influence accuracy. Kappa is low **
+definition of the label y results in a lower quality of predictions, still above the selected threshold accuracy > 0.90, with a much more complex mode.*
 
 
 
@@ -745,7 +755,7 @@ A wider definition of the label y results in a lower quality of predictions, sti
 ## Feasibility
 
 This notebook demonstrates that a machine learning algorithm can predict whether a company belongs to the group of "top performers", given a sufficiently narrow definition of the label and sufficiently large dataset. 
-The feasibility has been demonstrated for a binary classification algorithm (namely a single tree, generated by the recursive partitioning algorithm of r-part library. The dataset used for learning and validation is composed of n = `r nrow(data)` observations and n = `r ncol(data)` features, obtained from a larger dataset of regional companies, filtered on NACE sectors of activity and on year 2019.
+The feasibility has been demonstrated for a binary classification algorithm (namely a single tree, generated by the recursive partitioning algorithm of r-part library. The dataset used for learning and validation is composed of n = `r nrow(data)` observations and p = `r ncol(data)` features, obtained from a larger dataset of regional companies, filtered on NACE sectors of activity and on year 2019.
 
 THree case studies have been examined in detailed, using different definitions of the y label (isTop9, a narrow definition addressing 6% of companies, isTop8 and isTop7 providing boader definitions). The model has been tuned to maximize accuracy on test data using a nested k-fold cross validation loops for tuning and assessing experimentally the performance,
 
@@ -776,8 +786,145 @@ Preliminary results suggest further investigations:
 
 Acknowlegments: Marinella Favot for suggesting new indicators, and specifically VAS, that resulted a very effective predictor of y9.
 
+https://en.wikipedia.org/wiki/Sensitivity_and_specificity
+
+```{r}
+require(tidyverse)
+
+y7 <- ys %>% mutate(isTop = as.factor(isTop7)) %>%  select(idCompany,isTop)
+data7 <- X %>% inner_join(y7) %>% select(-idCompany)
+data.learn <- data7 %>% slice( indexes.learning) 
+data.test  <- data7 %>% slice(-indexes.learning)
+
+optimal.params7 <- AutoTuneTree(data.learn, data.test, k_folds_testing, k_folds_tuning, minsplit_candidates)
+optimal.minsplit7 <-  optimal.params7 %>% head(1) %>% select(minsplit) %>% pull
+optimal.tree7 <- rpart( isTop~., 
+                        data.learn, 
+                        method = "class", 
+                        minsplit = optimal.minsplit7, 
+                        cp = -1)
+predicted.y = predict(optimal.tree7, data.test, type="class")
+cm <-   table(predicted.y, data.test$isTop)
+cm
+require(caret)
+confusionMatrix( predicted.y, data.test$isTop)
+   
+
+total <- sum(cm)
+true.neg  <- cm[1,1]
+false.neg <- cm[1,2]
+
+false.pos <- cm[2,1]
+true.pos  <- cm[2,2]
+
+pos = true.pos + false.neg
+neg = true.neg + false.pos
+
+accuracy <- (true.pos + true.neg) / (pos+neg)
+
+fnr = false.neg/pos
+specificity <- 1-fnr# Specificity: The “true negative rate”
+
+fpr <- false.pos/neg
+sensitivity <- 1-fpr # Sensitivity: The “true positive rate” 
+
+
+
+p0 <- ( true.pos + true.neg) / total #proportion of observed agreement
+#pe <- ( true.neg + false.neg)/total * (true.neg + false.pos)/ total # Proportion of chance agreement
+col1 = true.neg+false.neg
+row1 = true.neg+false.pos
+col2 = true.pos+false.pos
+row2 = true.pos+false.neg
+
+pe <- (row1/total * col1/total) +(row2/total * col2/total)# Proportion of chance agreement
+
+kappa7 = (p0-pe)/(1-pe)
+kappa7 
+ 
+
+ggplot()+
+   geom_point(aes(data9$relStaffBalance, data9$relNoi, color = data7$isTop))+ 
+    geom_point(aes(errors$relStaffBalance, errors$relNoi, color = errors$isTop))
+
+
+print("Confusion matrix and accurcy of simple tree on test data:")
+print( computeConfusionMatrix(optimal.tree7, data.test ) ) 
+print( computeAccuracy(optimal.tree7, data.test)  )
+
+```
+
+
+ACCURACY FOR UBALANCED DATASETS
+https://medium.com/strands-tech-corner/unbalanced-datasets-what-to-do-144e0552d9cd#:~:text=In%20unbalanced%20datasets%2C%20the%20%E2%80%9CAccuracy%20Paradox%E2%80%9D%20is%20common.,then%20the%20model%E2%80%99s%20accuracy%20will%20be%20above%2090%25.
+
+Kappa: Classification accuracy normalized by the imbalance of the classes in the data.
+K = (p0-pe)/(1-pe)
 
 ```{r}
 
+y8 <- ys %>% mutate(isTop = as.factor(isTop8)) %>%  select(idCompany,isTop)
+data7 <- X %>% inner_join(y8) %>% select(-idCompany)
+data.learn <- data7 %>% slice( indexes.learning) 
+data.test  <- data7 %>% slice(-indexes.learning)
+
+optimal.params8 <- AutoTuneTree(data.learn, data.test, k_folds_testing, k_folds_tuning, minsplit_candidates)
+optimal.minsplit8 <-  optimal.params7 %>% head(1) %>% select(minsplit) %>% pull
+optimal.tree8 <- rpart( isTop~., 
+                        data.learn, 
+                        method = "class", 
+                        minsplit = optimal.minsplit7, 
+                        cp = -1)
+predicted.y = predict(optimal.tree8, data.test, type="class")
+cm <-   table(predicted.y, data.test$isTop)
+cm
+require(caret)
+confusionMatrix( predicted.y, data.test$isTop)
+   
+
+total <- sum(cm)
+true.neg  <- cm[1,1]
+false.neg <- cm[1,2]
+
+false.pos <- cm[2,1]
+true.pos  <- cm[2,2]
+
+pos = true.pos + false.neg
+neg = true.neg + false.pos
+
+accuracy <- (true.pos + true.neg) / (pos+neg)
+
+fnr = false.neg/pos
+specificity <- 1-fnr# Specificity: The “true negative rate”
+
+fpr <- false.pos/neg
+sensitivity <- 1-fpr # Sensitivity: The “true positive rate” 
+
+
+
+p0 <- ( true.pos + true.neg) / total #proportion of observed agreement
+#pe <- ( true.neg + false.neg)/total * (true.neg + false.pos)/ total # Proportion of chance agreement
+col1 = true.neg+false.neg
+row1 = true.neg+false.pos
+col2 = true.pos+false.pos
+row2 = true.pos+false.neg
+
+pe <- (row1/total * col1/total) +(row2/total * col2/total)# Proportion of chance agreement
+
+kappa = (p0-pe)/(1-pe)
+print(kappa)
+ 
+ 
+
+ggplot()+
+   geom_point(aes(data9$relStaffBalance, data9$relNoi, color = data7$isTop))+ 
+    geom_point(aes(errors$relStaffBalance, errors$relNoi, color = errors$isTop))
+
+
+print("Confusion matrix and accurcy of simple tree on test data:")
+print( computeConfusionMatrix(optimal.tree7, data.test ) ) 
+print( computeAccuracy(optimal.tree7, data.test)  )
 ```
+
+
 

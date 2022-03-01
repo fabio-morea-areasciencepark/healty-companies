@@ -1,0 +1,169 @@
+scratch
+
+### construction of the datasets (Top8 andd Top9)
+We consider a supervised binary classification approach, in which a company has to be classified as Top Performer using a *binary decision tree*. 
+
+In the context of a feasibility study, the binary decision tree has two key advantages over other solutions: models are *interpretable* (we can easily follow the path from input data to predictions, printing the tree structure in a textual form or plotting a graphical representation of the tree) and *explainable* (each step of the algorithm can b einspected and assess its importance to the model performance).
+
+The model will be generated in R using a recursive partitioning algorithm available in the `rpart` library using tho followig functions:
+
+* `rpart(formula, data, method, control)` for learning the model
+* `predict(model, data, ...)` for predicting 
+
+For the purpose of this research, we will use only two of the hyperparameter available in the library, namely `minsplit` (the minimum number of observations that must exist in a node in order for a split to be attempted) and `cp` (a complexity parameter that limits the creation of *small* branches:  any split that does not decrease the overall lack of fit by a factor of cp is not attempted). The standard set of parameters used in this simulation is: `parms = rpart.control(split = "gini", cp = .01 )`
+
+
+
+
+ 
+### Relevant datasets
+The first task in feature engineering is the selection of relevant datasets and features, based on domanin knowledge. The features that may have a predictive power on financial rating are "financial indicators" from the official balance sheet of each company, as well as some categorical attributes (is a startup, an "innovative SME", a "young" of "women-led companies" ). In this case the relevant datasets are available in the following files: 
+-  *cmp.csv* and *codes.csv*: company information from the Italian Business Registry. Each observation is a company, there are p = 41 attributes. The study will be focused on a subset filter companies that belong to a specific sector () and of a specific type.
+-  *bsd.csv*. Each observation is a summary of balance sheet data (bsd) of a company (identified by *cf*) for a given year. Column labels need some improvement to remove whitespaces and possibly short english names.
+- *rating.csv*. The financial rating of each company. 
+- *employees*. Stock and flows of employees. *empl-flow.csv* and *empl-stock.csv*. 
+Data is loaded in separate data structures (tibbles) 
+
+
+### Sample selection
+The sample is selected according to **NACE codes** and **company type**. The first selection on company type : we select all types that have a duty of disclosure of financial information, and therefore are suitable for the analysis, namely SU (società a responsabilità limitata con unico socio), SR (società a responsabilità limitata), SP (società per azioni), SD (società europea),  RS (società a responsabilità limitata semplificata), RR (società a responsabilità limitata a capitale ridotto), AU (società  per azioni con socio unico), AA (società in accomandita per azioni.
+
+A further selection is based on **NACE codes**. The acronym NACE stands for *Nomenclature of Economic Activities*, a standard classification for classifying business activities managed by EUROSTAT and recognized by national statistic offices at European level. NACE codes provide a framework for the collection and presentation of a wide range of statistics in economic fields such as production, employment, national accounts, and others. 
+
+Each company can be associated with one or more NACE codes, that may be different for each local unit, and are identified as main (I), "primary" (P), or "Ancillary" (S). The selected sample is composed of companies that have at least one NACE code in one of the following Divisions: 22 (Manufacture of rubber and plastic products), 23 (Manufacture of other non-metallic mineral products), 24 (Manufacture of basic metals), 25 (Manufacture of fabricated metal products, except machinery and equipment), 26 (Manufacture of computer, electronic and optical products), 27 (Manufacture of electrical equipment) and 28 (Manufacture of machinery and equipment).
+
+Some filters are applied: time-dependent data (such as balaance sheet data, rating and employees flows) are filtered to year 2019, and company age (years in business) is filtered to anly value greater than 1.
+
+
+The feature matrix *X* can be created by joining the tibbles on a company identifier (cf), selecting relevant features and mutating boolean variables into factors. 
+
+### 
+
+
+ 
+
+### Feature engineering
+The objective of feature engineering is to build a dataset that contains a set of relevant variables for learning and prediction, appropriately scaled, in the form of a matrix. 
+Specifically we will focus on calculating new features based on domain knowledge, checking variable correlation and normalizing the selected features by centering and scaleing.
+
+The original features are higly correlated, as higlighted in the following correlation matrix.  
+```{r, echo=FALSE}
+# run the "annexes" notebook to load the data
+wrap_plots(p.fe.1, p.fe.2)
+```
+
+Moreover, featur values range over different orders of magnitude (company age ranges from 1 to 150, while total assets ranges from 0 to $10^9$ €).
+
+
+We can tackle both issues by calculating new features that scale economic values to the company size, a common practice in economi analusys, that allows direct comparison of company performance regardless of comapny size. the rev features are named 'rel*' as they are scaled to the total assets (totAssets) or the total number of employees (StockAll) of each company.
+
+Correlation between the new features has significantly improved, as shown in the correlation matrix below. 
+
+Keeping only the new features, the dataset consists of n = r nrow(data) observations and p = r ncol(data) features (namely: `r names(data)` ). 
+
+The next step is to normalize (center and rescale) numeric features to the a similar range in order to improve the performance of the learning algorithm. 
+
+
+```{r, echo = FALSE}
+wrap_plots(p.fe.3,p.fe.4)
+```
+All features are of the same order of magnitude. The dataset is composed of n = r nrow(data) observations and p = r ncol(data) features (namely: `r names(data)` ). There meaning of variables is  self explanatory in some cases, but economic features may require an explanation, that can be found in Annexes.
+
+Features have different same predictive power on y label. The decision tree will provide a detailed estimate of each variable, but at this stage we can have a basic idea of the predictive power of each variable by examining the distributions of observations according to the label
+
+```{r, echo=FALSE, error=FALSE, warning=FALSE, message=FALSE}
+p.fe.5
+```
+
+Some features, namely *relNoi* (net operative income scaled to total assets), relEquity (total equity scaled to total assets) and VAS (Value Added on total Staff), are clearly separate according to label y9 and can therefore be expected to be good predictors.
+
+
+# 4.2 Procedure
+### Performance of regression trees on the balanced dataset (y7)   
+Function AutoTune Tree() defined in the Annexes
+
+```{r, error=FALSE, warning=FALSE, message=FALSE}
+ 
+#split train and test data 
+fraction = .8
+indexes.learning = sample(c(1:nrow(data)))[1:(nrow(data)*fraction)]
+data.learn <- data %>% slice( indexes.learning) 
+data.test  <- data %>% slice(-indexes.learning)
+
+# define the range for minsplit parameter that give high sensitivity
+minsplit_candidates = seq(1,240,20)
+
+#define k-fold validation (computational cost vs quality)
+k_folds_tuning=3
+k_folds_testing=3
+optimal.params <- AutoTuneTree(data.learn, data.test, 
+                               k_folds_testing, 
+                               k_folds_tuning, 
+                               minsplit_candidates)
+
+```
+ result of Auto TuneTree: 
+```{r, error=FALSE, warning=FALSE, message=FALSE}
+optimal.minsplit  <- optimal.params %>% head(1) %>% select(minsplit) %>% pull
+optimal.acc.learn <- optimal.params %>% head(1) %>% select(ac.learn) %>% pull
+optimal.acc.test  <- optimal.params %>% head(1) %>% select(ac.test) %>% pull
+
+optimal.tree <- rpart(  isTop~.,data.learn, 
+                        method = "class", 
+                        minsplit = optimal.minsplit, 
+                        cp = .001)
+summ.results<-optimal.params %>% group_by(minsplit)%>%
+  summarise(ac.test=mean(ac.test), ac.learn=mean(ac.learn), 
+            se.test=mean(se.test), se.learn=mean(se.learn), 
+            sp.test=mean(sp.test), sp.learn=mean(sp.learn), f=f, n=n)%>%
+  group_by(f) %>%
+  mutate(sp.se = sp.test / se.test)
+
+p10 <- folds.results %>% pivot_longer(cols=c(ac.test, sp.test, se.test)) %>% 
+  ggplot(aes(x=name, y=value, color = name))+
+  geom_boxplot(show.legend = FALSE)+ggtitle("summary results for optimal tree")+ylab("")+xlab("")+
+  geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)
+
+```
+
+```{r}
+rpart.plot(optimal.tree)
+
+```
+
+
+ 
+
+```{r, error=FALSE, warning=FALSE, message=FALSE}
+p11 <- tibble(features=names(optimal.tree$variable.importance) , imp=optimal.tree$variable.importance) %>%
+  mutate(imp = round(imp,1))%>%
+  ggplot(aes(reorder(features, imp, sum), imp))  + coord_flip()+
+  labs(x="", y="variable importance") +
+  geom_bar(stat="identity", fill="light green")+ 
+  geom_text(aes(label=imp))
+
+wrap_plots(p10,p11)
+```
+
+
+
+\newpage
+
+# Annexes
+
+## Data management plan
+
+
+
+
+Original and tidy data are updated on a monthly basis; the current version in based on June 2021 version and does not provide automatic updating. 
+
+The original data available from Innovation Intelligence and fulfills the following requirements:
+
+- encoded in UTF-8, cleaned from non-printable characters
+- table columns are attributes (features, independent variables), renamed to be human- and machine-readable
+- table rows are observations  If you have multiple tables, they should include a column in the table that allows them to be linked
+- splitted into several tables, created unique identifiers to connect the tables
+- saved each table to separate .csv file with a hunam-readable name.
+
+No attributes were removed or summarized during pre-processing. Pre-processing is described in a separate notebook, providing details on all the attributes available in the raw data, and the transformations used to produce a smaller, cleaner data set ready for further analysis. Tidy data is saved in local folder *data/tidy*.
