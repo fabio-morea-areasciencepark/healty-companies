@@ -8,7 +8,7 @@ output:
     fig_height: 3
 bibliography: references.bib
 link-citations: yes
-csl: plos-one.csl
+csl: plos.csl
 nocite: '@*'
 ---
 
@@ -86,7 +86,7 @@ The performance shall be assessed in two cases: a balanced dataset in which the 
 
 # 2. Assessment and performance indexes
 
-Three indexes will be used to measure performance: accuracy, sensitivity and specificity.
+Three indexes will be used to measure performance of each model, and effectiveness on unseen data: accuracy, sensitivity (or True Positive Rate, TPR, denotes the ability to correctly classify companies that are in the "top" group) and specificity (or True Negative Rate, TRN, denotes the ability to correctly classify companies that are in the "other" group). 
 
 $$Accuracy = (True Positive +True Negative)/AllCases$$
 $$Sensitivity = True Positive / (True Positive + False Negative) = 1 - FNR$$ 
@@ -217,7 +217,7 @@ p.fe.4 <- X %>%  select(-idCompany)  %>% stack() %>% ggplot(aes(x = ind, y = val
 
 ```
 
-```{r echo=FALSE, fig.cap=paste("Correlation and distribution of after features engineering"), fig.height=4, fig.width=8, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r echo=FALSE, fig.cap=paste("Correlation and distribution of features, after features engineering"), fig.height=4, fig.width=8, message=FALSE, warning=FALSE, paged.print=FALSE}
 wrap_plots(p.fe.3,p.fe.4)
 ```
 
@@ -249,7 +249,7 @@ data8.learn = data8[ indexes.learning,]
 data8.test =  data8[-indexes.learning,]
 ```
 
-## 4.2 Performance of decision trees on balanced datast 
+## 4.2 Performance of decision trees on balanced dataset 
 
 Using the rpart() library, we can explore the effect of a flexibility parameter (minsplit) on the performance indexes (accuracy, sensitivity and selectivity). The decision tree will be tuned using the parameter minsplit, and setting the parameter cp to a fixed value (cp = .001) in order to allow a complexity budget, and keep the model reasonably simple to enhance explainability and interpretability. 
 
@@ -276,10 +276,10 @@ computeConfusionMatrix = function(model, data) {
 # this procedure is part of the Annexes
 computeAccuracySensitivitySpecificity =  function(model, data) {
   conf.matrix <- computeConfusionMatrix (model, data)
-  true.neg  <- conf.matrix[1,1]
+  true.neg  <- conf.matrix[2,2]
   false.neg <- conf.matrix[1,2]
   false.pos <- conf.matrix[2,1]
-  true.pos  <- conf.matrix[2,2]
+  true.pos  <- conf.matrix[1,1]
   pos = true.pos + false.neg
   neg = true.neg + false.pos
   accuracy <- (true.pos + true.neg) / (pos+neg)
@@ -293,7 +293,7 @@ Learning and prediction are based a stochastic process (splitting data into lear
 
 
 ```{r error=FALSE, message=FALSE, warning=FALSE, include=FALSE}
-compute.Kfold.AccuracySensitivitySpecificity <- function(data,  k_folds=10, minsplit, cp) {
+compute.Kfold.AccuracySensitivitySpecificity <- function(data,  k_folds=5, minsplit, cp) {
   data_f <- data %>% sample_frac(1) %>% 
   group_by(isTop) %>% 
   mutate(fold=rep(1:k_folds, length.out=n())) %>% ungroup
@@ -334,7 +334,7 @@ Using the rpart() library, explore the effect of a flexibility parameter (minspl
 ```{r error=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 tuning.results = tibble() 
 
-for (mspl in seq(1,500,5)){
+for (mspl in seq(1,300,5)){
     tuning.results <- tuning.results %>% 
       bind_rows(compute.Kfold.AccuracySensitivitySpecificity(data7.learn,  k_folds=5, minsplit=mspl, cp=cp_fixed ))
 }
@@ -376,7 +376,24 @@ p05<-summ.results%>%  ggplot() + theme_minimal()+
 
 ```
 
-```{r echo=FALSE, error=FALSE, fig.cap=paste("Experimental evaluation of accuracy, sensitivity and selectivity for a single decision tree on the balanced dataset y7"), fig.height=4, fig.width=8, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r eval=FALSE, include=FALSE}
+# mm<-readRDS('model_tree_8.rds')
+# conf.matrix<-computeConfusionMatrix(mm, data8.learn)
+#   true.neg  <- conf.matrix[2,2]
+#   false.neg <- conf.matrix[1,2]
+#   false.pos <- conf.matrix[2,1]
+#   true.pos  <- conf.matrix[1,1]
+#   pos = true.pos + false.neg
+#   neg = true.neg + false.pos
+#   accuracy <- (true.pos + true.neg) / (pos+neg)
+#   sensitivity <- true.pos/(true.pos+false.neg) # Sensitivity: The “true positive rate” 
+#   specificity <- true.neg/(true.neg+false.pos)# Specificity: The “true negative rate”
+
+```
+
+
+
+```{r echo=FALSE, error=FALSE, fig.cap=paste("Experimental evaluation of accuracy, sensitivity and selectivity for a single decision tree on the balanced dataset"), fig.height=3, fig.width=8, message=FALSE, warning=FALSE, paged.print=FALSE}
 wrap_plots(p03,p04,p05, guides = 'collect')
 ```
 
@@ -526,7 +543,7 @@ data.to.plot.7  <- data.to.plot.7 %>%
 ```
 
 
-```{r echo=FALSE, fig.cap=paste("A visual representation of the binary decision tree optimized for the imbalanced dataset y7"), fig.height=4, fig.width=8, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r echo=FALSE, fig.cap=paste("A visual representation of two binary decision trees, optimized in different ranges of the flexibility parameter - balanced dataset y7"), fig.height=3, fig.width=8, message=FALSE, warning=FALSE, paged.print=FALSE}
 figures <- par(mfrow=c(1,2)) # more trees in the same figure
 modelTree7Spec  %>% rpart.plot(  main="high specificity classification tree", shadow.col = "gray")
 modelTree7Sens %>% rpart.plot(  main="high sensitivity classification tree")
@@ -535,41 +552,38 @@ par(figures)
 
 
 ## 4.3 Performance of random forrest on balanced datast 
-A Random Forrest model can be fit to the train data and assessed on the test data, using caret library and the embedded repeated cross validation method. Performance is assessed using the custom function assesAccuracySensitivityScpecificityCaret(). 
+A Random Forrest model can be fit to the train data and assessed on the test data, using caret library and the embedded repeated cross validation method. Performance is assessed using the custom function kFoldassesAccuracySensitivityScpecificityRF(). 
 
 ```{r error=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 
-assesAccuracySensitivityScpecificityCaret <- function(train, test, ctrl, name, data.to.plot, k=10) {
+kFoldassesAccuracySensitivityScpecificityRF <- function(data, ctrl, name, k_folds=10) {
 
-  data_f <- test %>% 
+  data_f <- data %>% 
     sample_frac(1) %>% 
-    group_by(isTop) %>% 
+    group_by(Class) %>% 
     mutate(fold=rep(1:k_folds, length.out=n())) %>% 
     ungroup
   
-  folds.results = tibble(f = NA, ac.learn = NA, sp.learn = NA, se.learn = NA, 
-                                 ac.test = NA,  sp.test = NA,  se.test = NA, 
-                                 n = NA, minsplit = NA) %>% head(0)
+  folds.results = tibble(f = NA, name = '', accuracy = NA,  specificity = NA,  sensitivity = NA) %>% head(0)
 
   for(i in 1:k_folds){
     data.kth.fold    <- data_f %>% filter(fold==i) 
     data.other.folds <- data_f %>% filter(fold!=i)
     modelRF <- train(Class ~ .,
                     data = data.other.folds,
-                    positive = "other",
+                    positive = "top",
                     method = "rf",
                     verbose = FALSE,
                     metric = "ROC",
                     trControl = ctrl)
+    predicted.y = predict(modelRF, data.kth.fold, type = "prob")[,"top"]
     
-    predicted.y = predict(model, data.kth.fold, type="class")
+    conf.matrix <- table(predicted.y>=.5, data.kth.fold$Class=="top" )
     
-    conf.matrixa <- table(predicted.y, data$isTop)
-    
-    true.neg  <- conf.matrix[1,1]
-    false.neg <- conf.matrix[1,2]
-    false.pos <- conf.matrix[2,1]
-    true.pos  <- conf.matrix[2,2]
+  true.neg  <- conf.matrix[1,1]
+  false.neg <- conf.matrix[1,2]
+  false.pos <- conf.matrix[2,1]
+  true.pos  <- conf.matrix[2,2]
     pos = true.pos + false.neg
     neg = true.neg + false.pos
     accuracy <- (true.pos + true.neg) / (pos+neg)
@@ -577,33 +591,13 @@ assesAccuracySensitivityScpecificityCaret <- function(train, test, ctrl, name, d
     specificity <- true.neg/(true.neg+false.pos)# Specificity: The “true negative rate”
      
     folds.results <-  folds.results %>% 
-    add_row(f = i , 
-            
-            ac.test  = accuracy,  
-            sp.test  = specificity,  
-            se.test  = sensitivity,
-            n = nrow(model$frame), 
-            minsplit = minsplit)
+    add_row(f = i , name = name,
+            accuracy  = accuracy,  
+            specificity  = specificity,  
+            sensitivity  = sensitivity)
   }
   
   return(folds.results)
-  predicted.y <- predict(modelRF, newdata= test)
-
-  conf.matrix <- table(predicted.y, test$Class) 
-
-  true.neg  <- conf.matrix[2,2]
-  true.pos  <- conf.matrix[1,1]
-  false.neg <- conf.matrix[2,1]
-  false.pos <- conf.matrix[1,2]
-  pos = true.pos + false.neg
-  neg = true.neg + false.pos
- 
-  data.to.plot  <- data.to.plot %>% 
-    add_row( tibble_row(indic = 'accuracy',   method =  name,value =  (true.pos + true.neg) / (pos+neg) )) %>%
-    add_row( tibble_row(indic = 'sensitivity',method =  name,value =  (true.pos/(true.pos+false.neg))  )) %>%
-    add_row( tibble_row(indic = 'specificity',method =  name,value =  (true.neg/(true.neg+false.pos)) ))
-  
-  return(data.to.plot)
 }
 
 ```
@@ -620,23 +614,51 @@ test.7  <- data7r %>% slice(-indexes.learning)
 # general control function for training
 ctrl <- trainControl(method = "repeatedcv",
                      number = 5,#10
-                     repeats = 1,#5
+                     repeats = 3,#5
                      summaryFunction = twoClassSummary,
                      savePredictions = "final",
                      classProbs = TRUE)
 
 
-data.to.plot.7 <- assesAccuracySensitivityScpecificityCaret(modelRF, test.7, 
+data.to.plot.rf.7 <- kFoldassesAccuracySensitivityScpecificityRF(data7r, 
                                                             ctrl,
                                                             name='y7 RF', 
-                                                            data.to.plot.7,
-                                                            k=10) 
+                                                            k_folds=10) 
  
+data.to.plot.7  <- data.to.plot.7 %>% 
+  add_row( tibble_row(indic = 'accuracy',   method =  'y7 RF', value =  mean(data.to.plot.rf.7$accuracy)))%>%
+  add_row( tibble_row(indic = 'sensitivity',method =  'y7 RF', value =  mean(data.to.plot.rf.7$sensitivity))) %>%
+  add_row( tibble_row(indic = 'specificity',method =  'y7 RF', value =  mean(data.to.plot.rf.7$specificity)))
+
+
+```
+
+
+```{r fig.height=3, fig.width=8, include=FALSE}
+p01 <- ggplot(data = data.to.plot.rf.7)+ggtitle("RF (k-fold results)")+ylab("")+xlab("")+
+  geom_line( aes(x=f, y=accuracy,color = "accuracy"))+
+  geom_line( aes(x=f, y=specificity,color = "specificity"))+
+  geom_line( aes(x=f, y=sensitivity,color = "sensitivity"))+ 
+  theme(legend.position="top")+
+  geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+ylim(.6,1)
+ 
+p02 <- data.to.plot.rf.7 %>% select(-name, -f)%>% 
+  pivot_longer(everything(),names_to = "name" , values_to = "value" )  %>%
+  ggplot(aes(x=name, y=value, color = name))+
+  geom_boxplot(show.legend = FALSE)+ggtitle("RF performance indexes")+ylab("")+xlab("")+
+  geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+ylim(.6,1)
+
+```
+
+```{r echo=FALSE, fig.cap=paste("Experimantal assessment of accuracy, sensitivity and specificity for a random forrest model on a balanced dataset y7, using k-fold cross validation"), fig.height=3, fig.width=8, message=FALSE, warning=FALSE, paged.print=FALSE}
+
+wrap_plots(p01,p02,  guides = 'collect')
+
 
 ```
  
 
-```{r echo=FALSE, error=FALSE, fig.cap=paste("Experimantal assessment of accuracy, sensitivity and specificity for a random forrest model on a balanced dataset y7, using oversampling, undersampling"), fig.height=4, fig.width=8, message=FALSE, warning=FALSE}
+```{r echo=FALSE, error=FALSE, fig.cap=paste("Comparison of results of experimantal assessment of accuracy, sensitivity and specificity for a random forrest model on a balanced dataset y7, using k-fold cross validation"), fig.height=3, fig.width=8, message=FALSE, warning=FALSE}
 data.to.plot.7 %>% 
   mutate(method1 = factor(method, 
                           levels = c('y7 tree SPEC', 'y7 tree SENS',  'y7 RF'  ))) %>%
@@ -747,7 +769,7 @@ summ.results<-tuning.results %>% group_by(minsplit)%>%
   geom_line(aes(x=minsplit, y = ac.test, group = f, colour = 'accuracy test')) + 
   geom_line(aes(x=minsplit, y = ac.learn,group = f, colour = 'accuracy learn')) + 
   scale_linetype_manual(values = c("dashed","solid"))+
-  scale_color_manual(values=c("black","red")) +  ylim(0.7,1)+ ylab("")+ 
+  scale_color_manual(values=c("black","red")) +  ylim(0.2,1)+ ylab("")+ 
   geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+
   geom_hline(yintercept = proportions$majority.class[2],col = 'yellow')
 
@@ -755,7 +777,7 @@ p04<- summ.results%>%  ggplot() + theme_minimal()+
   geom_line(aes(x=minsplit, y = se.test, group = f, colour = 'sensitivity test')) + 
   geom_line(aes(x=minsplit, y = se.learn,group = f, colour = 'sensitivity learn')) + 
   scale_linetype_manual(values = c("dashed","solid"))+
-  scale_color_manual(values=c("black","green"))+  ylim(0.7,1)+ ylab("")+ 
+  scale_color_manual(values=c("black","green"))+  ylim(0.2,1)+ ylab("")+ 
   geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+
   geom_hline(yintercept = proportions$majority.class[2],col = 'yellow')
 
@@ -763,17 +785,16 @@ p05<-summ.results%>%  ggplot() + theme_minimal()+
   geom_line(aes(x=minsplit, y = sp.test, group = f, colour = 'specificity test')) + 
   geom_line(aes(x=minsplit, y = sp.learn,group = f, colour = 'specificity learn')) + 
   scale_linetype_manual(values = c("dashed","solid"))+
-  scale_color_manual(values=c("black","blue"))+  ylim(0,1)+ ylab("")+ 
+  scale_color_manual(values=c("black","blue"))+  ylim(0.2,1)+ ylab("")+ 
   geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+
   geom_hline(yintercept = proportions$majority.class[2] ,col = 'yellow')
 ```
 
 
-```{r echo=FALSE, fig.cap=paste("Experimental evaluation of accuracy, sensitivity and selectivity for a single decision tree on the inbalanced dataset y8"), fig.height=4, fig.width=8, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r fig.cap=paste("Experimental evaluation of accuracy, sensitivity and selectivity for a single decision tree on the inbalanced dataset y8"), message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
 wrap_plots(p03,p04,p05, guides = 'collect')
 ```
 
-As the Figure above clearly shows, accuracy and specificity surge to unrealistically high levels, while sensitivity drops remarkably. This is known as the "accuracy paradox" in unbalanced datasets, where simply predicting the majority class provides a high accuracy, associated with a high bias.
 
 ```{r error=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 optimal.params.8 <- AutoTuneTree(data8.learn, data8.test, 
@@ -791,14 +812,17 @@ optimal.tree.8 <- rpart(  isTop~.,data8.learn,
                         method = "class", 
                         minsplit = optimal.minsplit.8, 
                         cp = cp_fixed)
+saveRDS(optimal.tree.8, "model_tree_8.rds")
+
 ```
 
-```{r echo=FALSE, fig.cap=paste("A visual representation of the binary decision tree optimized fot the imbalanced dataset y8"), fig.height=4, fig.width=8, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r echo=FALSE, fig.cap=paste("A visual representation of the binary decision tree optimized fot the imbalanced dataset y8"), fig.height=3, fig.width=8, message=FALSE, warning=FALSE, paged.print=FALSE}
 rpart.plot(optimal.tree.8)
 ```
 
-Even after optimization, a decision tree model has a very poor performance. 
-```{r error=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+Even after optimization, a decision tree model has a very poor performance. Accuracy and specificity soar to the level of minority class, while sensitivity drops below 50%. 
+
+```{r echo=FALSE, error=FALSE, message=FALSE, warning=FALSE}
 summ.results.8<-optimal.params.8 %>% group_by(minsplit)%>%
   summarise(ac.test=mean(ac.test), ac.learn=mean(ac.learn), 
             se.test=mean(se.test), se.learn=mean(se.learn), 
@@ -814,12 +838,17 @@ data.to.plot.8  <- data.to.plot.8 %>%
 
 p11 <- summ.results.8 %>% pivot_longer(cols=c(ac.test, sp.test, se.test)) %>% 
   ggplot(aes(x=name, y=value, color = name))+
-  geom_boxplot(show.legend = FALSE)+ggtitle("summary results for optimal tree")+ylab("")+xlab("")+
-  geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+ylim(0,1)
+  geom_boxplot(show.legend = FALSE)+ggtitle("summary results for optimal tree - imbalanced dataset")+ylab("")+xlab("")+
+  geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+ylim(0,1)+
+    geom_hline(yintercept = proportions$majority.class[2],col = 'yellow')
+
 p11
 
 
 ```
+
+This is known as the "accuracy paradox" in unbalanced datasets, where simply predicting the majority class provides high accuracy, associated with a high bias: the model misclassifies the "top" performing companie
+
 ## 4.5 Performance of Random Forrest on inbalanced dataset 
 
 Similarly, a Random Forrest model has poor performance. One technique for resolving such a class imbalance is to sub-sample the training data in a manner that mitigates the issues. Examples of sampling methods for this purpose are:
@@ -850,25 +879,60 @@ ctrl <- trainControl(method = "repeatedcv",
                      savePredictions = "final",
                      classProbs = TRUE)
 
-data.to.plot.8 <- assesAccuracySensitivityScpecificityCaret(train.8, test.8, ctrl,
+data.to.plot.rf.8 <- kFoldassesAccuracySensitivityScpecificityRF(data8r, 
+                                                                 ctrl,
                                                           name='y8 RF', 
-                                                          data.to.plot.8) 
+                                                          k_folds=10)
+ data.to.plot.8  <- data.to.plot.8 %>% 
+  add_row( tibble_row(indic = 'accuracy',   method =  'y8 RF', value =  mean(data.to.plot.rf.8$accuracy)))%>%
+  add_row( tibble_row(indic = 'sensitivity',method =  'y8 RF', value =  mean(data.to.plot.rf.8$sensitivity))) %>%
+  add_row( tibble_row(indic = 'specificity',method =  'y8 RF', value =  mean(data.to.plot.rf.8$specificity)))
 
 ctrl$sampling <- "up" 
-data.to.plot.8 <- assesAccuracySensitivityScpecificityCaret(train.8, test.8, ctrl, 
+data.to.plot.rf.8 <- kFoldassesAccuracySensitivityScpecificityRF(data8r, 
+                                                                 ctrl, 
                                                           name='y8 RF UP', 
-                                                          data.to.plot.8) 
+                                                          k_folds=10) 
+ data.to.plot.8  <- data.to.plot.8 %>% 
+  add_row( tibble_row(indic = 'accuracy',   method =  'y8 RF UP', value =  mean(data.to.plot.rf.8$accuracy)))%>%
+  add_row( tibble_row(indic = 'sensitivity',method =  'y8 RF UP', value =  mean(data.to.plot.rf.8$sensitivity))) %>%
+  add_row( tibble_row(indic = 'specificity',method =  'y8 RF UP', value =  mean(data.to.plot.rf.8$specificity)))
 
 ctrl$sampling <- "down" 
-data.to.plot.8 <- assesAccuracySensitivityScpecificityCaret(train.8, test.8, ctrl, 
+data.to.plot.rf.8 <- kFoldassesAccuracySensitivityScpecificityRF(data8r, 
+                                                                 ctrl, 
                                                           name='y8 RF DOWN', 
-                                                          data.to.plot.8)
+                                                          k_folds=10)
+
+ data.to.plot.8  <- data.to.plot.8 %>% 
+  add_row( tibble_row(indic = 'accuracy',   method =  'y8 RF DOWN', value =  mean(data.to.plot.rf.8$accuracy)))%>%
+  add_row( tibble_row(indic = 'sensitivity',method =  'y8 RF DOWN', value =  mean(data.to.plot.rf.8$sensitivity))) %>%
+  add_row( tibble_row(indic = 'specificity',method =  'y8 RF DOWN', value =  mean(data.to.plot.rf.8$specificity)))
+```
+
+
+```{r echo=FALSE, fig.height=3, fig.width=8}
+p01 <- ggplot(data = data.to.plot.rf.8)+ggtitle("RF (k-fold results)")+ylab("")+xlab("")+
+  geom_line( aes(x=f, y=accuracy,color = "accuracy"))+
+  geom_line( aes(x=f, y=specificity,color = "specificity"))+
+  geom_line( aes(x=f, y=sensitivity,color = "sensitivity"))+ 
+  theme(legend.position="top")+
+  geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+ylim(0,1)
+ 
+p02 <- data.to.plot.rf.8 %>% select(-name, -f)%>% 
+  pivot_longer(everything(),names_to = "name" , values_to = "value" )  %>%
+  ggplot(aes(x=name, y=value, color = name))+
+  geom_boxplot(show.legend = FALSE)+ggtitle("RF performance indexes")+ylab("")+xlab("")+
+  geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+ylim(0,1)
+ 
+
+wrap_plots(p01,p02,  guides = 'collect')
+
 
 ```
 
 
-
-```{r echo=FALSE, fig.cap=paste("Experimantal assessment of accuracy, sensitivity and specificity for a random forrest model on a inbalanced dataset y8, using oversampling, undersampling"), fig.height=4, fig.width=8, message=FALSE, warning=FALSE, paged.print=FALSE}
+```{r echo=FALSE, fig.cap=paste("Experimantal assessment of accuracy, sensitivity and specificity for a random forrest model on a inbalanced dataset y8, using oversampling, undersampling"), fig.height=3, fig.width=8, message=FALSE, warning=FALSE, paged.print=FALSE}
 
  data.to.plot.8 <- data.to.plot.8 %>% 
   mutate(method1 = factor(method, levels = c('y8 tree', 'y8 RF', 'y8 RF UP', 'y8 RF DOWN'))) 
@@ -983,7 +1047,7 @@ aucs.7<-aucs.7%>%mutate(bal = "balanced")
 aucs.8<-aucs.8%>%mutate(bal = "inbalanced")
 table.auc <- bind_rows(aucs.7,aucs.8) %>%
   filter( (method == 'orig' & bal == 'balanced') | 
-            (method == 'orig' & bal == 'inbalanced') |
+            # (method == 'orig' & bal == 'inbalanced') |
             (method == 'down' & bal == 'inbalanced')) %>%
   mutate(across(where(is.numeric), round, 3))%>%
   mutate(dataset = bal)%>% 
@@ -1014,7 +1078,7 @@ compare.auc.plot <- compare.auc%>%
 ```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
 
 ROC.comp <- ggplot()+
-  geom_line(aes(x=1-roc.orig.8$sensitivities, y=roc.orig.8$specificities, col="imbalanced"))+
+  #geom_line(aes(x=1-roc.orig.8$sensitivities, y=roc.orig.8$specificities, col="imbalanced"))+
   geom_line(aes(x=1-roc.down.8$sensitivities, y=roc.down.8$specificities, col="imbalanced-down"))+
   geom_line(aes(x=1-roc.orig.7$sensitivities, y=roc.orig.7$specificities, col="balanced"))+
   theme_minimal()+
@@ -1036,18 +1100,18 @@ ROC.comp <- ggplot()+
 ROC.comp
 
 ```
-
+The AUC index is similato for both curves, hence the predictions on an inbalanced dataset can be expected to achieve the same quality of predictions on a balanced dataset.
 
 
 # 5. Concluding remarks  
 
-This project demonstrates that a machine learning algorithm can predict whether a company belongs to the group of "top performers" with accuracy, sensitivity of the order of 80%, and that quality of predictions depends strongly on the definition on the degree of imbalance of the  dataset. 
+This project demonstrates that a machine learning algorithm can predict whether a company belongs to the group of "top performers" with accuracy, sensitivity of the order of 80%, and that the same quality of predictions can be achieved also for strongly inbalanced datasets. 
 
-The performance has been demonstrated for a binary classification algorithm (namely a single tree, generated by the recursive partitioning algorithm of r-part library) and for a random Forrest. The dataset used for learning and validation is composed of n = `r nrow(data)` observations and p = `r ncol(data)` features, obtained from a larger dataset of regional companies, filtered on NACE sectors of activity and on year 2019.
+The dataset used for learning and validation is composed of n = `r nrow(data)` observations and p = `r ncol(data)` features, obtained from a larger dataset of regional companies, filtered on NACE sectors of activity and on year 2019. 
+The performance has been assessed experimentally for a binary classification algorithm (namely a single tree, generated by the recursive partitioning algorithm of r-part library) and for a random Forrest.
+Two case studies have been examined in detail, using different definitions of the y label (isTop8, a narrow definition addressing about 15% of the sample) and isTop7 (a balanced dataset addressing about half of the companies).
 
-Two case studies have been examined in detailed, using different definitions of the y label (isTop8, a narrow definition addressing about 15% of the sample) and isTop7 (a balanced dataset addressing about half of the companies).
-
-The model has been tuned to maximize accuracy on test data using a nested k-fold cross validation loops for tuning and assessing experimentally the performance, a procedure that gives good results for balanced datasets. The imbalanced datasets has been treated with a *random Forrest* model and an oversampling of the minority class, to achieve a good accuracy, and improving on sensitivity and specificity.
+The model has been tuned to maximize accuracy on test data (checking that sensitivity and specificity are within an acceptable range) using a nested k-fold cross validation procedure. The imbalanced datasets performs equally well with a *random Forrest* model, earned using an oversampling of the minority class, to achieve a good accuracy, and improving on sensitivity and specificity.
 
 In both cases computation time is of the order of minutes, depending on the number of folds in k-fold cross validation, which is in line with the constraints of the project. The accuracy of predictions has been measured experimentally, and results are in all cases around 80%. Specifically, key results are summarized in the following table.
 
