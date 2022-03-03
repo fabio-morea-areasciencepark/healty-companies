@@ -464,7 +464,7 @@ Train for max accuracy, in a range of minsplit with high specificity
 optimal.spec.7 <- AutoTuneTree(data7.learn, data7.test, 
                                k_folds_testing=3, 
                                k_folds_tuning=3, 
-                               minsplit_candidates=seq(200,400,5))
+                               minsplit_candidates=seq(250,400,2))
 
 ```
 
@@ -477,6 +477,7 @@ modelTree7Spec <- rpart(  isTop~.,data7.learn,
                         cp = cp_fixed)
  
 saveRDS(modelTree7Spec, "model_tree_7_spec.rds")
+
 ```
 
 
@@ -513,11 +514,11 @@ Train another tree for max accuracy, in a range of minsplit with high sensitivit
  optimal.sens.7 <- AutoTuneTree(data7.learn, data7.test, 
                                k_folds_testing=3, 
                                k_folds_tuning=3, 
-                               minsplit_candidates=seq(80,120,1))
+                               minsplit_candidates=seq(50,120,2))
 
 
 
-optimal.minsplit.7.sens  <- optimal.sens.7 %>% head(1) %>% select(minsplit) %>% pull
+optimal.minsplit.sens.7  <- optimal.sens.7 %>% head(1) %>% select(minsplit) %>% pull
  
 summ.results.7 <-optimal.sens.7 %>% group_by(minsplit)%>%
   summarise(ac.test=mean(ac.test), ac.learn=mean(ac.learn), 
@@ -528,7 +529,7 @@ summ.results.7 <-optimal.sens.7 %>% group_by(minsplit)%>%
 
 modelTree7Sens <- rpart(  isTop~.,data7.learn, 
                         method = "class", 
-                        minsplit = optimal.minsplit.7.sens, 
+                        minsplit = optimal.minsplit.sens.7, 
                         cp = cp_fixed)
 
 saveRDS(modelTree7Sens, "model_tree_7_sens.rds")
@@ -626,7 +627,7 @@ data.to.plot.rf.7 <- kFoldassesAccuracySensitivityScpecificityRF(data7r,
                                                             k_folds=10) 
  
 data.to.plot.7  <- data.to.plot.7 %>% 
-  add_row( tibble_row(indic = 'accuracy',   method =  'y7 RF', value =  mean(data.to.plot.rf.7$accuracy)))%>%
+  add_row( tibble_row(indic = 'accuracy',   method =  'y7 RF', value =  mean(data.to.plot.rf.7$accuracy))) %>%
   add_row( tibble_row(indic = 'sensitivity',method =  'y7 RF', value =  mean(data.to.plot.rf.7$sensitivity))) %>%
   add_row( tibble_row(indic = 'specificity',method =  'y7 RF', value =  mean(data.to.plot.rf.7$specificity)))
 
@@ -636,11 +637,15 @@ data.to.plot.7  <- data.to.plot.7 %>%
 
 ```{r fig.height=3, fig.width=8, include=FALSE}
 p01 <- ggplot(data = data.to.plot.rf.7)+ggtitle("RF (k-fold results)")+ylab("")+xlab("")+
-  geom_line( aes(x=f, y=accuracy,color = "accuracy"))+
-  geom_line( aes(x=f, y=specificity,color = "specificity"))+
-  geom_line( aes(x=f, y=sensitivity,color = "sensitivity"))+ 
+  geom_point( aes(x=f, y=accuracy,color = "accuracy"))+
+  geom_point( aes(x=f, y=specificity,color = "specificity"))+
+  geom_point( aes(x=f, y=sensitivity,color = "sensitivity"))+ 
   theme(legend.position="top")+
-  geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+ylim(.6,1)
+  geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+ylim(.6,1)+
+  scale_x_continuous(breaks = seq(1, 10, by = 1))+
+   theme(panel.grid.major.x = element_line(color = "gray",
+                                        size = 0.5,
+                                        linetype = 1)) 
  
 p02 <- data.to.plot.rf.7 %>% select(-name, -f)%>% 
   pivot_longer(everything(),names_to = "name" , values_to = "value" )  %>%
@@ -663,7 +668,7 @@ data.to.plot.7 %>%
   mutate(method1 = factor(method, 
                           levels = c('y7 tree SPEC', 'y7 tree SENS',  'y7 RF'  ))) %>%
   ggplot()+ 
-  geom_line( aes(x = method, y = value, group = indic, color = indic))+
+  #geom_line( aes(x = method, y = value, group = indic, color = indic))+
   geom_point(aes(x = method, y = value, shape = method, color = indic, size = 4))+
   geom_hline(yintercept=.8,linetype = 'dotted', col = 'black', size=1)+ xlab("")+
   theme(axis.text.x = element_text(angle = 0))  + 
@@ -751,7 +756,7 @@ In classification problems, a disparity in the frequencies of the observed class
 ```{r error=FALSE, message=FALSE, warning=FALSE, include=FALSE}
 tuning.results = tibble() 
 
-for (mspl in seq(1,300,5)){
+for (mspl in seq(1,200,5)){
     tuning.results <- tuning.results %>% 
       bind_rows(compute.Kfold.AccuracySensitivitySpecificity(data8.learn,  k_folds=5, minsplit=mspl, cp=cp_fixed ))
 }
@@ -892,17 +897,16 @@ ctrl$sampling <- "up"
 data.to.plot.rf.8 <- kFoldassesAccuracySensitivityScpecificityRF(data8r, 
                                                                  ctrl, 
                                                           name='y8 RF UP', 
-                                                          k_folds=10) 
+                                                          k_folds=5) 
  data.to.plot.8  <- data.to.plot.8 %>% 
   add_row( tibble_row(indic = 'accuracy',   method =  'y8 RF UP', value =  mean(data.to.plot.rf.8$accuracy)))%>%
   add_row( tibble_row(indic = 'sensitivity',method =  'y8 RF UP', value =  mean(data.to.plot.rf.8$sensitivity))) %>%
   add_row( tibble_row(indic = 'specificity',method =  'y8 RF UP', value =  mean(data.to.plot.rf.8$specificity)))
 
 ctrl$sampling <- "down" 
-data.to.plot.rf.8 <- kFoldassesAccuracySensitivityScpecificityRF(data8r, 
-                                                                 ctrl, 
+data.to.plot.rf.8 <- kFoldassesAccuracySensitivityScpecificityRF(data8r, ctrl, 
                                                           name='y8 RF DOWN', 
-                                                          k_folds=10)
+                                                          k_folds=5)
 
  data.to.plot.8  <- data.to.plot.8 %>% 
   add_row( tibble_row(indic = 'accuracy',   method =  'y8 RF DOWN', value =  mean(data.to.plot.rf.8$accuracy)))%>%
@@ -913,18 +917,25 @@ data.to.plot.rf.8 <- kFoldassesAccuracySensitivityScpecificityRF(data8r,
 
 ```{r echo=FALSE, fig.height=3, fig.width=8}
 p01 <- ggplot(data = data.to.plot.rf.8)+ggtitle("RF (k-fold results)")+ylab("")+xlab("")+
-  geom_line( aes(x=f, y=accuracy,color = "accuracy"))+
-  geom_line( aes(x=f, y=specificity,color = "specificity"))+
-  geom_line( aes(x=f, y=sensitivity,color = "sensitivity"))+ 
+  geom_point( aes(x=f, y=accuracy,color = "accuracy"))+
+  geom_point( aes(x=f, y=specificity,color = "specificity"))+
+  geom_point( aes(x=f, y=sensitivity,color = "sensitivity"))+ 
   theme(legend.position="top")+
-  geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+ylim(0,1)
+  geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+ylim(0.6,1)+
+  scale_x_continuous(breaks = seq(1, 10, by = 1))+
+   theme(panel.grid.major.x = element_line(color = "gray",
+                                        size = 0.5,
+                                        linetype = 1)) 
+ 
+ 
  
 p02 <- data.to.plot.rf.8 %>% select(-name, -f)%>% 
   pivot_longer(everything(),names_to = "name" , values_to = "value" )  %>%
   ggplot(aes(x=name, y=value, color = name))+
   geom_boxplot(show.legend = FALSE)+ggtitle("RF performance indexes")+ylab("")+xlab("")+
-  geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+ylim(0,1)
- 
+  geom_hline(yintercept = .80, linetype = 'dotted', col = 'black', size=1)+ylim(0.6,1)
+
+
 
 wrap_plots(p01,p02,  guides = 'collect')
 
@@ -938,7 +949,7 @@ wrap_plots(p01,p02,  guides = 'collect')
   mutate(method1 = factor(method, levels = c('y8 tree', 'y8 RF', 'y8 RF UP', 'y8 RF DOWN'))) 
 data.to.plot.8%>%
   ggplot()+ 
-  geom_line( aes(x = method1, y = value, group = indic, color = indic))+
+  #geom_line( aes(x = method1, y = value, group = indic, color = indic))+
   geom_point(aes(x = method1, y = value, shape = method, color = indic, size = 4))+
   geom_hline(yintercept=.8,linetype = 'dotted', col = 'black', size=1)+ xlab("")+ylim(0,1)+
   theme(axis.text.x = element_text(angle = 0))  + theme(legend.position="right") +
@@ -967,7 +978,7 @@ bind_rows(data.to.plot.7, data.to.plot.8) %>%
 ```
 
 
-The comparison of performance can be visualized using the ROC Curve (Receiver Operating Characteristics),  measuring the  AUC (Area Under The Curve). 
+The comparison of performance can be visualized using the ROC Curve (Receiver Operating Characteristics, a graphical plot that illustrates the diagnostic ability of a binary classifier system as its discrimination threshold is varied) measuring the  AUC (Area Under The Curve).
 
 
 ```{r error=FALSE, message=FALSE, warning=FALSE, include=FALSE}
@@ -1100,7 +1111,7 @@ ROC.comp <- ggplot()+
 ROC.comp
 
 ```
-The AUC index is similato for both curves, hence the predictions on an inbalanced dataset can be expected to achieve the same quality of predictions on a balanced dataset.
+The AUC index is similar for both curves, hence the predictions on an inbalanced dataset can be expected to achieve the same quality of predictions on a balanced dataset.
 
 
 # 5. Concluding remarks  
